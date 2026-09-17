@@ -1,0 +1,79 @@
+# Market Briefing — 미국 증시·옵션플로우 자동 브리핑
+
+Hermes Agent가 **무료 데이터 소스만으로** 미국 증시와 옵션플로우를 수집해 한국어로 브리핑하는 시스템입니다. 모든 소스는 실측 검증되었고, 유료 API나 키가 필요한 서비스는 사용하지 않습니다.
+
+- **수집 스크립트 → JSON stdout → 크론 LLM이 한국어 브리핑 생성 → 텔레그램 전달**
+- 데이터 수집은 LLM 호출 없음(토큰 $0), 번역·요약만 LLM 사용(약 $0.01/회)
+
+## 결과물 (텔레그램 브리핑 4종)
+
+| 브리핑 | 시각 (KST) | 스크립트 | 내용 |
+|---|---|---|---|
+| 미국 증시 아침 보고 | 매일 07:00 | `us_market_report.py` | 전일 마감 지수·선물·금리·금속·화제종목·실적·뉴스·경제캘린더·옵션(OI/IV30/1SD) |
+| 미국 증시 저녁 보고 | 매일 21:00 | `us_market_report.py` | 동일 구성, 장 시작 전 전망 중심 |
+| 옵션플로우 장 시작 | 월–금 22:30 | `option_flow_open.py` | 프리마켓 전망 + 전일 마감 신호(오늘 관전 포인트) + 실적·경제·뉴스 |
+| 옵션플로우 장 마감 | 화–토 05:05 | `option_flow_close.py` | 시장 백드롭 + 🟢/🔴 신호 + 결과 검증 + 비정상 OI 감지 |
+
+> 시각은 미국 정규장(09:30–16:00 ET)에 맞춘 값입니다. 미국 DST 전환 시 ET 기준 +1시간 이동합니다.
+
+## 옵션플로우 브리핑이 하는 일
+
+유료 옵션플로우 서비스(Unusual Whales, Cheddar Flow류)의 브리핑 형식을 **무료 소스로 재현**한 것입니다:
+
+- **유니버스 61종**: 고정 56종(반도체·소프트웨어·핀테크·대형주) + Yahoo Trending 5종
+- **비정상 OI 감지**: CBOE 옵션 체인에서 콜/풋 총 OI를 분리 집계해 전일 스냅샷과 비교
+  - 🔴풋 = 풋 OI +10% 이상 & 주가 -1% 이하 (신규 숏 베팅)
+  - 🟢콜 = 콜 OI +10% 이상 & 주가 +1% 이상 (신규 롱 베팅)
+- **자체 컨빅션 스코어 (0–100)**: OI 변동 35 + 주가 움직임 30 + IV 레벨 20 + 1σ 이탈 15
+- **1σ 이탈**: `1SD% = iv30 × √(30/365)` — 일간 변동이 이를 초과하면 플래그
+- **시장 백드롭**: 지수 4종 + SOXX + VIX 조합 → -100~+100 점수 + 레이블
+- **결과 검증**: 전일 신호를 저장해 두고 다음 실행에서 종가/고점/저점 % + hit/miss 판정
+
+### 재현 불가 항목 (정직 명시)
+
+다크풀 프린트, 실시간 옵션 체결(스윕/블록), 외부 컨빅션 스코어는 **유료 서비스 전용 데이터**라 무료로 구현할 수 없습니다. 이 시스템은 OI 증감·IV·가격 데이터로 그 **구조만** 재현합니다.
+
+## 저장소 구조
+
+```
+scripts/
+  us_market_report.py       # 증시 보고 수집 (시세·뉴스·실적·경제캘린더·옵션)
+  option_flow_report.py     # 옵션플로우 수집 (open/close 모드, 신호·검증·스냅샷)
+  option_flow_open.py       # open 모드 진입점 (크론용)
+  option_flow_close.py      # close 모드 진입점 (크론용)
+state/
+  oi_snapshot.json          # 증시 보고용 전일 OI 스냅샷
+  flow_oi_snapshot.json     # 옵션플로우용 전일 콜/풋 OI 스냅샷 (별도 파일)
+  flow_signals.json         # 전일 신호 저장 (다음 실행에서 결과 검증)
+docs/
+  data-sources.md           # 검증된 무료 소스 목록 (실측 결과 포함)
+  signal-rules.md           # 신호·백드롭·검증 계산 규칙
+  cron-jobs.md              # 크론잡 4개 설정 + LLM 프롬프트 전문
+  pitfalls.md               # 실측으로 발견한 함정과 우회
+SKILL.md                    # Hermes 운영 스킬 문서 (노하우 포함)
+```
+
+## 실행 방법
+
+```bash
+python scripts/us_market_report.py                 # 증시 보고 JSON 출력
+python scripts/option_flow_report.py close         # 옵션플로우 마감 (61종 CBOE 순차, ~3분)
+python scripts/option_flow_report.py open          # 옵션플로우 장 시작 (~10초)
+```
+
+외부 의존성 없음 — 표준 라이브러리만 사용합니다(`urllib`, `json`, `re`, `concurrent.futures`). Python 3.8+.
+
+## 데이터 소스
+
+전부 무료·무키 소스입니다. 상세 실측 결과는 [docs/data-sources.md](docs/data-sources.md).
+
+- **Yahoo Finance chart API** — 지수·선물·종목 시세, 정규장 OHLC (가격의 정본)
+- **CBOE 지연 옵션 API** — 종목별 옵션 체인 (OI, IV, 1SD 계산용)
+- **Nasdaq API** — 실적 발표 캘린더
+- **CNBC RSS** — 시장 뉴스
+- **investing.com** — 경제 캘린더 (USD, 중요도 2+)
+- **Yahoo Trending** — 화제 종목
+
+## 라이선스
+
+개인 용도. 데이터는 각 제공자의 이용약관을 따릅니다.

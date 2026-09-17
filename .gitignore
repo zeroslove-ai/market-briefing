@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 로컬 상태 파일 (스냅샷은 state/에 예시로만 커밋)
+*.log
+*.tmp
+
+# 환경/비밀값
+.env
+.env.*
+*.key
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 에디터
+.vscode/
+.idea/
