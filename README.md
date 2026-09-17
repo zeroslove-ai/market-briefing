@@ -5,6 +5,21 @@ Hermes Agent가 **무료 데이터 소스만으로** 미국 증시와 옵션플�
 - **수집 스크립트 → JSON stdout → 크론 LLM이 한국어 브리핑 생성 → 텔레그램 전달**
 - 데이터 수집은 LLM 호출 없음(토큰 $0), 번역·요약만 LLM 사용(약 $0.01/회)
 
+## 개발 예정 — Hermes Sigma Intelligence
+
+Sigma Dashboard의 핵심 아이디어를 참고해, **금요일에 고정한 다음 주 옵션 기대범위에서 현재 가격이 몇 σ 위치인지**를 시장·섹터·종목 단위로 계산하고 기존 OI 신호와 합치는 확장을 설계 중입니다.
+
+핵심 원칙은 `계산은 deterministic, 해설은 LLM`입니다. 기존 IV30/30D 1SD와 새 Weekly Sigma는 서로 다른 시간축으로 분리합니다.
+
+설계 정본:
+
+- [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — 계산·제품 정본
+- [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 파일 구조·PR 순서·테스트·완료 기준
+- [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 투자/옵션 비전문가용 쉬운 해설 기준
+- [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션용 authority/인수인계
+
+> 현재 위 Sigma 문서는 **설계 authority**이며 production 구현은 아직 기존 브리핑에 반영되지 않았습니다. S1은 Friday Freeze → Daily Z → Market/Sector Breadth → Telegram 설명 순으로 구현합니다.
+
 ## 결과물 (텔레그램 브리핑 4종)
 
 | 브리핑 | 시각 (KST) | 스크립트 | 내용 |
@@ -50,6 +65,7 @@ docs/
   signal-rules.md           # 신호·백드롭·검증 계산 규칙
   cron-jobs.md              # 크론잡 4개 설정 + LLM 프롬프트 전문
   pitfalls.md               # 실측으로 발견한 함정과 우회
+  hermes-sigma-*.md         # Sigma Intelligence 설계/해설/구현 authority
 SKILL.md                    # Hermes 운영 스킬 문서 (노하우 포함)
 ```
 
