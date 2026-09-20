@@ -1,4 +1,10 @@
-# Hermes Sigma Intelligence — AI / Codex Handoff
+# Hermes R1 / Sigma — AI Handoff
+
+> R1 UPDATE: 새 세션은 Sigma만 단독 구현하지 말고 먼저 `docs/hermes-integrated-intelligence-r1.md`와 Issue #2/#3을 읽는다.
+> 실행 순서: R1-0 Data Integrity Foundation -> R1-1 Sigma (#1) -> Evidence Engine -> 기존 4종 보고 통합.
+> `feature/hermes-r1-data-core`가 첫 구현 브랜치다.
+
+---
 
 Status: SESSION HANDOFF AUTHORITY (R0)
 
