@@ -5,20 +5,32 @@ Hermes Agent가 **무료 데이터 소스만으로** 미국 증시와 옵션플�
 - **수집 스크립트 → JSON stdout → 크론 LLM이 한국어 브리핑 생성 → 텔레그램 전달**
 - 데이터 수집은 LLM 호출 없음(토큰 $0), 번역·요약만 LLM 사용(약 $0.01/회)
 
-## 개발 예정 — Hermes Sigma Intelligence
+## 개발 예정 — Hermes R1 Integrated Market Intelligence
 
-Sigma Dashboard의 핵심 아이디어를 참고해, **금요일에 고정한 다음 주 옵션 기대범위에서 현재 가격이 몇 σ 위치인지**를 시장·섹터·종목 단위로 계산하고 기존 OI 신호와 합치는 확장을 설계 중입니다.
+기존 4종 브리핑을 유지하면서 Weekly Sigma·시장/섹터 breadth·OI·금리/VIX/달러·이벤트를 함께 교차검증해 **무엇이 바뀌었고 왜 그렇게 해석하는지**를 설명하는 구조로 확장합니다.
 
-핵심 원칙은 `계산은 deterministic, 해설은 LLM`입니다. 기존 IV30/30D 1SD와 새 Weekly Sigma는 서로 다른 시간축으로 분리합니다.
+핵심 흐름: `공통 데이터 정본 -> deterministic 분석 -> Evidence/Counter-evidence -> LLM 해설 -> Telegram`
 
-설계 정본:
+설계 authority:
 
-- [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — 계산·제품 정본
-- [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 파일 구조·PR 순서·테스트·완료 기준
-- [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 투자/옵션 비전문가용 쉬운 해설 기준
-- [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션용 authority/인수인계
+1. [`docs/hermes-integrated-intelligence-r1.md`](docs/hermes-integrated-intelligence-r1.md) — 최상위 제품/분석 정본
+2. [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — Weekly Sigma 계산 정본
+3. [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 실제 PR 구현 순서
+4. [`docs/hermes-sigma-briefing-contract.md`](docs/hermes-sigma-briefing-contract.md) — 기존 4종 보고 + 깊은 설명 규칙
+5. [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 비전문가용 쉬운 해설
+6. [`docs/hermes-sigma-task-board.md`](docs/hermes-sigma-task-board.md) — 실행 작업보드
+7. [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션 인수인계
 
-> 현재 위 Sigma 문서는 **설계 authority**이며 production 구현은 아직 기존 브리핑에 반영되지 않았습니다. S1은 Friday Freeze → Daily Z → Market/Sector Breadth → Telegram 설명 순으로 구현합니다.
+> 구현 순서는 **R1-0 Data Integrity Foundation -> R1-1 Sigma -> R1-2 Evidence Engine -> 4종 보고 통합**입니다. 기존 production 보고는 단계별 회귀 테스트로 유지합니다.
+
+R1의 4개 보고 역할:
+
+- 07:00: **Close Autopsy** — 전일 미국장 사후해설
+- 21:00: **Pre-market Setup** — 아침 이후 변화 + 오늘 밤 관전 조건
+- Opening: **Opening Watch** — setup 확인/무효화
+- 05:05: **Session Verdict** — breadth/Sigma/OI 변화와 다음 세션 carry-over
+
+현재 코드에서 R1-0로 먼저 정리할 핵심은 CBOE 가격 사용 제거, OI baseline 단일화, repo-root state 통일, ZoneInfo/DST 대응, 미국 세션 기준 날짜, 중복 fetch cache입니다.
 
 ## 결과물 (텔레그램 브리핑 4종)
 
