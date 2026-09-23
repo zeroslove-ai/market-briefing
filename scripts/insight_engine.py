@@ -82,16 +82,19 @@ def _calendar_context(payload: dict, features: dict, claims: list[dict]) -> list
         text = title.lower()
         importance = int(event.get("importance") or 0)
         reasons = []
+        event_claims = set()
         if oil_day and any(k in text for k in ("eia", "petroleum", "oil", "crude")):
             importance = min(3, importance + 1)
             reasons.append("오늘 유가 변동폭이 커 재고·공급 확인 가치가 높습니다.")
+            event_claims.update({"OIL_DISINFLATION_TAILWIND", "OIL_DEMAND_SCARE"})
         if rate_day and any(k in text for k in ("treasury", "auction", "fed", "fomc", "speech")):
             importance = min(3, importance + 1)
             reasons.append("10년 금리 변동폭이 커 금리 촉매를 확인할 필요가 있습니다.")
+            event_claims.update({"RATES_TAILWIND_GROWTH", "RATES_HEADWIND_GROWTH"})
         if not reasons:
             reasons.append("일정의 기본 중요도를 유지합니다.")
         result.append({**event, "contextual_importance": importance, "why_today_matters": " ".join(reasons),
-                       "related_claims": sorted(claim_ids & ({"RATES_TAILWIND_GROWTH", "RATES_HEADWIND_GROWTH"} if rate_day else set()))})
+                       "related_claims": sorted(claim_ids & event_claims)})
     return sorted(result, key=lambda e: (-e["contextual_importance"], e.get("scheduled_at_kst") or e.get("scheduled_date") or ""))
 
 

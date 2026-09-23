@@ -83,12 +83,13 @@ def build_claims(features: dict, anomalies: list[dict], payload: dict) -> list[d
     # Optional Sigma/OI confluence appears only when source snapshots provide usable values.
     sigma = payload.get("sigma") or {}
     oi = payload.get("oi_anomalies") or []
+    oi_values = payload.get("options") or {}
     if sigma and oi:
         claims.append({"claim_id": "SIGMA_OI_CONFIRMED", "support": ["Sigma state and OI anomaly are both present"],
                        "counter_evidence": ["OI alone does not identify trade intent"], "confidence": "MEDIUM",
                        "affected_assets": list(sigma.get("symbols", [])), "what_to_watch": "price acceptance near the relevant Sigma band",
                        "interpretation_type": "evidence_backed_interpretation"})
-    elif sigma and payload.get("oi_anomalies") is not None:
+    elif sigma and isinstance(oi_values, dict) and oi_values:
         claims.append({"claim_id": "SIGMA_OI_CONFLICT", "support": ["Sigma state exists but no aligned OI anomaly is present"],
                        "counter_evidence": ["OI coverage may be incomplete"], "confidence": "LOW",
                        "affected_assets": list(sigma.get("symbols", [])), "what_to_watch": "subsequent OI snapshot and price response",

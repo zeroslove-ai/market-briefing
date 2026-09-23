@@ -426,8 +426,6 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
         parts.extend(f"- {line}" for line in options)
 
     quality = _safe_quality(payload)
-    if quality:
-        parts += ["", "■ 데이터 품질", *[f"- {item}" for item in quality]]
 
     watch = insight.get("what_to_watch") or []
     if watch:
@@ -437,6 +435,8 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
     if research:
         parts.append("※ 큰 움직임의 원인에 대한 외부 심층 확인은 조사 대기 중이며, 인과는 확정하지 않았습니다.")
     parts += ["", "※ 수치와 파생 feature는 같은 canonical snapshot에서 계산됩니다. 원인 해석은 근거와 함께 구분합니다."]
+    if quality:
+        parts += ["", "■ 데이터 품질", *[f"- {item}" for item in quality]]
     plain = "\n".join(parts).strip()
 
     html_sections = [
@@ -482,7 +482,6 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
         html_sections.append("<h2>오늘 확인할 것</h2><ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in insight["what_to_watch"][:5]) + "</ul>")
     if insight.get("research_needed"):
         html_sections.append("<p><small>큰 움직임의 원인에 대한 외부 심층 확인은 조사 대기 중이며, 인과는 확정하지 않았습니다.</small></p>")
-    if quality:
-        html_sections.append("<h2>데이터 품질</h2><ul>" + "".join(f"<li>{html.escape(str(item))}</li>" for item in quality) + "</ul>")
-    html_body = "<html><body style=\"font-family:Arial,sans-serif;line-height:1.55\">" + "".join(html_sections) + "<p><small>동일 canonical snapshot 기반. 원인 해석은 확인 가능한 근거와 함께 구분합니다.</small></p></body></html>"
+    quality_html = "<h2><small>데이터 품질</small></h2><ul>" + "".join(f"<li><small>{html.escape(str(item))}</small></li>" for item in quality) + "</ul>" if quality else ""
+    html_body = "<html><body style=\"font-family:Arial,sans-serif;line-height:1.55\">" + "".join(html_sections) + "<p><small>동일 canonical snapshot 기반. 원인 해석은 확인 가능한 근거와 함께 구분합니다.</small></p>" + quality_html + "</body></html>"
     return subject, plain, html_body

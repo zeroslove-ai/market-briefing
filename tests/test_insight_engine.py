@@ -46,3 +46,12 @@ def test_claims_keep_interpretations_distinct_from_observed_support():
     oil = next(item for item in claims if item["claim_id"] == "OIL_DISINFLATION_TAILWIND")
     assert oil["interpretation_type"] == "evidence_backed_interpretation"
     assert any("원인은 확인되지 않음" in item for item in oil["counter_evidence"])
+
+
+def test_sigma_oi_conflict_requires_both_sigma_and_observed_oi_values():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["sigma"] = {"symbols": ["NVDA"]}
+    assert not any(c["claim_id"].startswith("SIGMA_OI_") for c in build_insight(payload)["claims"])
+    payload["options"] = {"NVDA": {"total_oi": 10}}
+    claims = {c["claim_id"] for c in build_insight(payload)["claims"]}
+    assert "SIGMA_OI_CONFLICT" in claims
