@@ -95,3 +95,8 @@ def test_write_artifacts_produces_payload_email_and_telegram(monkeypatch, tmp_pa
     rendered = morning_delivery.write_artifacts(payload)
     assert all(__import__("pathlib").Path(path).exists() for path in rendered["paths"].values())
     assert "PAYX" in __import__("pathlib").Path(rendered["paths"]["telegram"]).read_text(encoding="utf-8")
+    gmail_handoff = __import__("json").loads(__import__("pathlib").Path(rendered["paths"]["gmail_mcp"]).read_text(encoding="utf-8"))
+    assert gmail_handoff["provider"] == "gmail_mcp"
+    assert gmail_handoff["recipient_strategy"] == "authenticated_profile_self"
+    assert "PAYX" in gmail_handoff["body"]
+    assert "GMAIL_APP_PASSWORD" not in str(gmail_handoff)
