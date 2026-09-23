@@ -47,6 +47,11 @@ def us_market_holidays(year: int) -> set[date]:
         _nth_weekday(year, 11, 3, 4),       # Thanksgiving
         _observed(date(year, 12, 25)),
     }
+    # If next year's Jan 1 is Saturday, its observed Friday falls on Dec 31
+    # of this year and must be included when evaluating this year's sessions.
+    next_new_year_observed = _observed(date(year + 1, 1, 1))
+    if next_new_year_observed.year == year:
+        holidays.add(next_new_year_observed)
     # Good Friday is the only non-weekend movable full-day closure here.
     easter = _easter_sunday(year)
     holidays.add(easter - timedelta(days=2))
@@ -158,4 +163,3 @@ def get_market_clock(phase: Optional[str] = None, now: Optional[datetime] = None
         last_regular_session=last_actual_regular_session(now),
         phase=actual_phase,
     )
-

@@ -70,21 +70,55 @@ def load_oi_baseline(session_date: Optional[date | str] = None) -> dict:
     """
     path = state_path("option", "oi_close_snapshot.json")
     document = read_json(path)
-    if not document:
-        # Backward-compatible read of the original state file.
-        legacy = read_json(state_path("oi_snapshot.json"), {}) or {}
-        return {"session_date": None, "snapshots": legacy.get("data", legacy) if isinstance(legacy, dict) else {}}
+    if document is None:
+        # Prior option-flow releases used this full-universe baseline. Keep it
+        # read-only here: only the option-flow close job owns baseline writes.
+        document = next((candidate for candidate in (
+            read_json(STATE_ROOT / "flow_oi_snapshot.json"),
+            read_json(REPO_ROOT / "scripts" / "flow_oi_snapshot.json"),
+            read_json(STATE_ROOT / "oi_snapshot.json"),
+            read_json(REPO_ROOT / "scripts" / "oi_snapshot.json"),
+        ) if isinstance(candidate, dict) and candidate), {})
     if "data" in document and isinstance(document["data"], dict):
         document = document["data"]
+    snapshots = document.get("snapshots")
+    if not isinstance(snapshots, dict):
+        snapshots = {key: value for key, value in document.items()
+                     if isinstance(value, dict) and any(k in value for k in ("call_oi", "put_oi", "total_oi"))}
+    # Older wrappers sometimes called the payload `data`.
+    if not snapshots and isinstance(document.get("data"), dict):
+        snapshots = document["data"]
     if "snapshots" in document:
         if session_date is not None and document.get("session_date") == _session_string(session_date):
             return {"session_date": document.get("previous_session_date"), "snapshots": document.get("previous_snapshots", {})}
-        return {"session_date": document.get("session_date"), "snapshots": document.get("snapshots", {})}
-    return {"session_date": document.get("session_date"), "snapshots": document.get("snapshots", document)}
+        return {"session_date": document.get("session_date"), "snapshots": snapshots}
+    return {"session_date": document.get("session_date") or document.get("date"), "snapshots": snapshots}
 
 
-def commit_oi_close(session_date: date | str, snapshots: dict) -> dict:
+def load_flow_signals() -> dict:
+    """Load current signals, migrating known legacy locations into state/option."""
+    canonical = state_path("option", "flow_signals.json")
+    document = read_json(canonical)
+    if isinstance(document, dict):
+        return document
+    legacy = next((candidate for candidate in (
+        read_json(STATE_ROOT / "flow_signals.json"),
+        read_json(REPO_ROOT / "scripts" / "flow_signals.json"),
+    ) if isinstance(candidate, dict)), {})
+    if legacy:
+        migrated = dict(legacy)
+        migrated.setdefault("schema_version", SCHEMA_VERSION)
+        migrated.setdefault("generated_at", utc_now_iso())
+        migrated.setdefault("session_date", legacy.get("date"))
+        atomic_write_json(canonical, migrated)
+        return migrated
+    return {}
+
+
+def commit_oi_close(session_date: date | str, snapshots: dict, *, owner: str) -> dict:
     """Commit one close snapshot; same-session commits keep the old baseline."""
+    if owner != "option_flow_close":
+        raise PermissionError("OI baseline writes are owned by option_flow close only")
     path = state_path("option", "oi_close_snapshot.json")
     existing = read_json(path, {}) or {}
     existing_data = existing.get("data", existing) if isinstance(existing, dict) else {}

@@ -167,13 +167,6 @@ def main(phase=None):
         reverse=True,
     )[:5]]
 
-    if clock.phase == "close":
-        from state_store import commit_oi_close
-        commit_oi_close(clock.market_session_date, {
-            symbol: {key: value.get(key) for key in ("call_oi", "put_oi", "total_oi")}
-            for symbol, value in output["options"].items() if "error" not in value
-        })
-
     snapshot = persist_report_snapshot(clock.phase, output, clock.market_session_date)
     print(json.dumps(snapshot, ensure_ascii=False, indent=1))
 

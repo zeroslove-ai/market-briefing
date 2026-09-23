@@ -25,7 +25,7 @@ import time
 from market_clock import ET, KST, get_market_clock
 from market_data import RunCache, cboe_chain_summary, fetch_url, yahoo_chart_quote, yahoo_daily_last as shared_yahoo_daily_last
 from report_snapshots import persist_report_snapshot
-from state_store import atomic_write_json, commit_oi_close, load_oi_baseline, read_json, state_path
+from state_store import atomic_write_json, commit_oi_close, load_flow_signals, load_oi_baseline, read_json, state_path
 
 _RUN_CACHE = RunCache()
 
@@ -206,7 +206,6 @@ def main(mode):
     global _RUN_CACHE
     _RUN_CACHE = RunCache()
     clock = get_market_clock(mode)
-    sig_path = state_path("option", "flow_signals.json")
 
     out = {"generated_at": clock.now_kst.strftime("%Y-%m-%d %H:%M%z"), "mode": mode, "meta": clock.as_dict()}
 
@@ -239,7 +238,7 @@ def main(mode):
 
     if mode == "open":
         # 3) 전일 마감 신호 재표시 (오늘 관전 포인트)
-        prev = load_json(sig_path) or {}
+        prev = load_flow_signals()
         out["prev_signals"] = prev.get("signals", [])
         out["prev_session"] = prev.get("date", "")
     else:
@@ -313,7 +312,7 @@ def main(mode):
         out["oi_anomalies"] = anomalies
 
         # 5) 전일 신호 결과 검증 (종가/고점/저점 %)
-        prev = load_json(sig_path) or {}
+        prev = load_flow_signals()
         verification = []
         if prev.get("signals"):
             def verify_one(sig):
@@ -345,8 +344,8 @@ def main(mode):
         commit_oi_close(clock.market_session_date, {
             s: {"call_oi": o.get("call_oi"), "put_oi": o.get("put_oi"), "total_oi": o.get("total_oi")}
             for s, o in option_data.items() if "error" not in o and o.get("total_oi")
-        })
-        save_json(sig_path, {
+        }, owner="option_flow_close")
+        save_json(state_path("option", "flow_signals.json"), {
             "schema_version": 1, "generated_at": clock.now_kst.isoformat(),
             "session_date": clock.market_session_date.isoformat(), "date": ses, "signals": out["signals"],
         })
