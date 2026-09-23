@@ -1,5 +1,5 @@
 [Unit]
-Description=Market Briefing R1 06:30 dual delivery
+Description=Market Briefing R1 06:30 artifacts + Telegram delivery
 After=network-online.target
 Wants=network-online.target
 
