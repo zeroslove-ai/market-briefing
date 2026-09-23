@@ -19,6 +19,9 @@ def test_golden_sample_builds_deterministic_claims_queue_and_insight_rendering()
     assert {"semiconductor", "oil"} <= {item["query"].split()[0] for item in insight["research_queue"]}
     assert insight["economic_events"][0]["contextual_importance"] == 3
     assert len(insight["earnings"]["top"]) <= 5
+    futures = {row["metric"]: row for row in insight["market_map"] if row["metric"] in {"ES", "NQ", "YM", "RTY"}}
+    assert set(futures) == {"ES", "NQ", "YM", "RTY"}
+    assert "neutral_or_unavailable" not in " ".join(row["interpretation"] for row in futures.values())
 
     subject, email, email_html = render_email_full(payload)
     telegram = "\n".join(render_telegram_compact(payload))

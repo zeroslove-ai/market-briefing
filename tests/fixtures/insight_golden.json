@@ -12,6 +12,7 @@
     "futures": {
       "es": {"change_pct": 0.09},
       "nq": {"change_pct": 0.04},
+      "ym": {"change_pct": 0.08},
       "rty": {"change_pct": -0.06}
     },
     "rates": {"us10y": {"price": 4.963, "change": -0.04}},

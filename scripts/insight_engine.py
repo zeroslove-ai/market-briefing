@@ -54,7 +54,14 @@ def _market_map(features: dict) -> list[dict]:
             explanation = "금리 하락은 성장주 할인율에 우호적인 방향입니다." if value < 0 else "금리 상승은 성장주 할인율 부담을 높일 수 있습니다."
         elif kind == "futures":
             display = f"{value:+.2f}%"
-            explanation = f"전일 현물과 {features.get('futures_vs_cash_direction', 'neutral_or_unavailable')} 방향입니다."
+            cash_direction = features.get("cash_session_direction", 0)
+            futures_direction = 1 if value > 0 else -1 if value < 0 else 0
+            if not cash_direction or not futures_direction:
+                explanation = "전일 현물 방향과의 비교 신호는 중립 또는 자료 부족입니다."
+            elif futures_direction == cash_direction:
+                explanation = "전일 현물 지수와 같은 방향으로 움직였습니다."
+            else:
+                explanation = "전일 현물 지수와 반대 방향으로 움직였습니다."
         elif kind == "volatility":
             change = features.get("vix_change_pct")
             display = f"{value:.2f} ({change:+.2f}%)" if change is not None else f"{value:.2f}"

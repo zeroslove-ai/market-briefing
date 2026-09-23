@@ -55,7 +55,7 @@ def calculate_features(board: dict) -> dict:
     cash_values = [v for v in equities.values() if v is not None]
     cash_mean = sum(cash_values) / len(cash_values) if cash_values else 0
     cash_direction = 1 if cash_mean > 0 else -1 if cash_mean < 0 else 0
-    futures = {key: _num(_q(board, "futures", key), "change_pct") for key in ("es", "nq", "rty")}
+    futures = {key: _num(_q(board, "futures", key), "change_pct") for key in ("es", "nq", "ym", "rty")}
     valid_futures = [v for v in futures.values() if v is not None]
     future_mean = sum(valid_futures) / len(valid_futures) if valid_futures else 0
     futures_direction = 1 if future_mean > 0 else -1 if future_mean < 0 else 0
