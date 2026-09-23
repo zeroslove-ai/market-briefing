@@ -1,0 +1,2 @@
+# Windows and minimal containers do not always ship IANA timezone data.
+tzdata>=2024.1

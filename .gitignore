@@ -9,6 +9,12 @@ venv/
 *.log
 *.tmp
 
+# Runtime-generated R1 snapshots (the directories themselves are tracked).
+state/market_snapshot_latest.json
+state/report_snapshots/*.json
+state/report_history/*.jsonl
+state/option/*.json
+
 # 환경/비밀값
 .env
 .env.*
