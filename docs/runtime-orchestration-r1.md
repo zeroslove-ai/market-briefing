@@ -29,6 +29,39 @@ Reviewed: 2026-09-23
 
 Narrative adapter는 Hermes/OpenAI/Grok 등으로 교체 가능하게 만든다.
 
+## 1A. Server decision — 2026-09-23
+
+Production primary는 **현재 사용자 Windows PC가 아니라 외부 Linux VPS**로 둔다.
+
+권장 1순위:
+- AWS Lightsail Seoul (`ap-northeast-2`)
+- Ubuntu LTS
+- 시작 사양: 1 GB RAM / 2 vCPU ($7/mo) 가능
+- 권장 사양: **2 GB RAM / 2 vCPU ($12/mo)** — 로그/SQLite/여유 메모리 포함
+- 06:30 Morning + 21:00 + Open + Close + watchdog 정도에는 충분한 수준
+
+현재 Windows PC의 역할:
+- Codex 개발
+- Aside browser
+- 수동 운영/SSH
+- emergency fallback
+- 로컬 테스트
+
+현재 PC를 primary로 두지 않는 이유:
+- sleep/reboot
+- Unity/Blender/Codex 병렬 사용
+- RAM/CPU contention
+- Windows update
+- 집 네트워크/전원 의존
+
+대안:
+- Railway Hobby: cron deployment가 쉽고 $5 minimum, 운영 편의성 높음. 다만 persistent state/timezone/플랫폼 종속을 고려하면 1차 core는 VPS가 단순함.
+- Oracle Always Free: 비용 매력은 있으나 free resource availability/idle 정책 때문에 primary production 추천도는 낮음.
+- GitHub Actions: primary scheduler가 아니라 watchdog/CI 용도.
+
+서버에는 브라우저 자동화/Grok Bot/Cursor를 설치하지 않는다.
+**시장 core Python + state + delivery만** 둔다.
+
 ## 2. 권장 운영 구조
 
 ### Primary Core Runner
