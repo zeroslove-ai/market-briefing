@@ -25,6 +25,7 @@ def test_golden_sample_builds_deterministic_claims_queue_and_insight_rendering()
 
     subject, email, email_html = render_email_full(payload)
     telegram = "\n".join(render_telegram_compact(payload))
+    assert len(telegram) <= 2500
     assert "반도체 주도" in subject and "SOXX +4.9%" in subject and "WTI -5.5%" in subject
     assert "HTTP 403" not in email and "HTTP 404" not in email
     assert "HTTP 403" not in email_html and "HTTP 404" not in email_html
@@ -70,4 +71,10 @@ def test_dxy_interpretation_follows_observed_direction():
 def test_failed_news_records_are_not_rendered_as_stories():
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     payload["news"] = [{"error": "RSS HTTP 403"}]
+    assert build_insight(payload)["story_clusters"] == []
+
+
+def test_unmatched_headlines_do_not_fill_story_slots():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["news"] = [{"title": "UN General Assembly photo gallery", "url": "https://example.test/gallery"}]
     assert build_insight(payload)["story_clusters"] == []

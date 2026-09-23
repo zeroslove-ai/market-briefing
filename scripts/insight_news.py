@@ -10,7 +10,7 @@ from state_store import atomic_write_json, state_path
 
 
 TOPICS = {
-    "semiconductor": {"semiconductor", "chip", "chips", "tsmc", "nvda", "nvidia", "amd", "micron", "mu", "soxx", "ai", "artificial intelligence"},
+    "semiconductor": {"semiconductor", "chip", "chips", "tsmc", "nvda", "nvidia", "amd", "micron", "mu", "soxx"},
     "oil": {"oil", "wti", "hormuz", "opec", "supply", "demand", "eia", "crude", "petroleum", "diesel"},
     "rates": {"yield", "bond", "fed", "federal reserve", "auction", "inflation", "interest rate", "interest rates", "treasury auction"},
     "growth": {"nasdaq", "growth", "technology", "tech", "russell", "small-cap", "small cap"},
@@ -134,7 +134,10 @@ def rank_and_cluster_news(news: list[dict], anomalies: list[dict], claims: list[
             "what_to_watch": "후속 공식 발표와 관련 자산의 가격 반응",
             "sources": links,
         })
-    return sorted(clusters, key=lambda x: x["relevance_score"], reverse=True)[:limit]
+    # A source link alone is not evidence of market relevance. Drop generic feed
+    # items with no asset/topic match so the ranking cannot become a top-N RSS list.
+    return [item for item in sorted(clusters, key=lambda x: x["relevance_score"], reverse=True)
+            if item["relevance_score"] >= 3][:limit]
 
 
 QUERY_BY_ANOMALY = {

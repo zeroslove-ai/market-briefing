@@ -308,6 +308,16 @@ def _claim_lines(payload: dict, limit: int = 5) -> list[str]:
     return _market_summary(payload)[:limit]
 
 
+def _telegram_map_rows(payload: dict) -> list[dict]:
+    """Keep the key cross-asset signals, each with a short interpretation."""
+    rows = (payload.get("insight") or {}).get("market_map") or []
+    if not rows:
+        return [{"metric": "", "value": "", "interpretation": line} for line in market_board_lines(payload)[:8]]
+    preferred = ("S&P 500", "Nasdaq", "Russell 2000", "SOXX", "10년물", "VIX", "DXY", "WTI")
+    by_name = {row.get("metric"): row for row in rows}
+    return [by_name[name] for name in preferred if name in by_name][:8]
+
+
 def _map_lines(payload: dict) -> list[str]:
     insight = payload.get("insight") or {}
     rows = insight.get("market_map") or []
@@ -327,27 +337,27 @@ def render_telegram_compact(payload: dict, max_chars: int = 2500) -> list[str]:
         f"🧭 {((payload.get('insight') or {}).get('conclusion') or '주요 자산의 흐름을 확인합니다.')}",
         "",
         "📊 Market Map",
-        *_map_lines(payload)[:10],
+        *[f"{row['metric']} {row['value']} — {row['interpretation']}" for row in _telegram_map_rows(payload)],
     ]
-    summary = _claim_lines(payload, 4)
+    summary = _claim_lines(payload, 3)
     if summary:
         lines += ["", "🔎 왜 중요한가", *[f"• {item}" for item in summary]]
 
-    news = _news_lines(payload, 3)
+    news = _news_lines(payload, 1)
     if news:
         lines += ["", "📰 관련 스토리", *[f"• {item}" for item in news[:3]]]
 
-    econ = _econ_lines(payload, 6)
+    econ = _econ_lines(payload, 3)
     if econ:
         lines += ["", "🗓 오늘 일정 (KST)", *econ]
     elif payload.get("econ_calendar"):
         lines += ["", "🗓 오늘 일정 (KST)", "• 경제 캘린더 소스 확인 필요"]
 
-    earnings = _earnings_lines(payload, 5)
+    earnings = _earnings_lines(payload, 3)
     if earnings:
         lines += ["", "🏢 주요 실적", *[f"• {item}" for item in earnings]]
 
-    watch = ((payload.get("insight") or {}).get("what_to_watch") or [])[:3]
+    watch = ((payload.get("insight") or {}).get("what_to_watch") or [])[:2]
     if watch:
         lines += ["", "🎯 오늘 확인할 것", *[f"• {item}" for item in watch]]
     quality = _safe_quality(payload)
