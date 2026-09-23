@@ -35,9 +35,12 @@ def calculate_features(board: dict) -> dict:
     rates = _num(_q(board, "rates", "us10y"), "change")
     assets = {
         "us10y_change_bp": rates * 100 if rates is not None else None,
+        "us30y_change_bp": (_num(_q(board, "rates", "us30y"), "change") * 100
+                            if _num(_q(board, "rates", "us30y"), "change") is not None else None),
         "vix_level": _num(_q(board, "volatility", "vix"), "price"),
         "vix_change_pct": _num(_q(board, "volatility", "vix"), "change_pct"),
         "dxy_change_pct": _num(_q(board, "fx", "dxy"), "change_pct"),
+        "usd_krw_change_pct": _num(_q(board, "fx", "usd_krw"), "change_pct"),
         "wti_change_pct": _num(_q(board, "commodities", "wti"), "change_pct"),
         "gold_change_pct": _num(_q(board, "commodities", "gold_futures"), "change_pct"),
         "silver_change_pct": _num(_q(board, "commodities", "silver_futures"), "change_pct"),

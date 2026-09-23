@@ -37,18 +37,24 @@ def _market_map(features: dict) -> list[dict]:
     definitions = [
         ("S&P 500", "sp500", "sp500"), ("Nasdaq", "nasdaq_composite", "nasdaq"),
         ("Russell 2000", "russell_2000", "russell"), ("SOXX", "soxx", "soxx"),
-        ("10년물", "us10y_change_bp", "rates"), ("VIX", "vix_level", "volatility"),
-        ("DXY", "dxy_change_pct", "fx"), ("WTI", "wti_change_pct", "oil"),
+        ("10년물", "us10y_change_bp", "rates"), ("30년물", "us30y_change_bp", "rates"),
+        ("VIX", "vix_level", "volatility"), ("DXY", "dxy_change_pct", "fx"),
+        ("USD/KRW", "usd_krw_change_pct", "fx_krw"), ("WTI", "wti_change_pct", "oil"),
         ("Gold", "gold_change_pct", "gold"), ("Silver", "silver_change_pct", "silver"),
         ("BTC 24h", "btc_change_pct_24h", "crypto"), ("ETH 24h", "eth_change_pct_24h", "crypto"),
+        ("ES", "es", "futures"), ("NQ", "nq", "futures"),
+        ("YM", "ym", "futures"), ("RTY", "rty", "futures"),
     ]
     for label, key, kind in definitions:
-        value = features.get(key)
+        value = features.get("futures_change_pct", {}).get(key) if kind == "futures" else features.get(key)
         if value is None:
             continue
-        if key == "us10y_change_bp":
+        if key in ("us10y_change_bp", "us30y_change_bp"):
             display = f"{value:+.0f}bp"
             explanation = "금리 하락은 성장주 할인율에 우호적인 방향입니다." if value < 0 else "금리 상승은 성장주 할인율 부담을 높일 수 있습니다."
+        elif kind == "futures":
+            display = f"{value:+.2f}%"
+            explanation = f"전일 현물과 {features.get('futures_vs_cash_direction', 'neutral_or_unavailable')} 방향입니다."
         elif kind == "volatility":
             change = features.get("vix_change_pct")
             display = f"{value:.2f} ({change:+.2f}%)" if change is not None else f"{value:.2f}"
@@ -61,6 +67,7 @@ def _market_map(features: dict) -> list[dict]:
                 "russell": "소형주 참여를 보여줘 상승 폭이 넓은지 확인하는 보조 지표입니다.",
                 "soxx": "반도체 업종의 상대 강도를 S&P와 비교해 주도 폭을 가늠합니다.",
                 "fx": "달러 강세는 금융여건이 전면 완화되지 않았을 가능성을 시사합니다.",
+                "fx_krw": "원화 환율은 달러 흐름과 한국 투자자의 환산 수익에 함께 영향을 줍니다.",
                 "oil": "급변은 물가·공급·수요 해석이 달라 원인 확인이 필요합니다.",
                 "gold": "금은 달러·실질금리·안전자산 수요와 함께 봅니다.",
                 "silver": "은은 귀금속 수요와 산업 경기 신호가 섞여 있습니다.",
@@ -98,7 +105,11 @@ def _calendar_context(payload: dict, features: dict, claims: list[dict]) -> list
     return sorted(result, key=lambda e: (-e["contextual_importance"], e.get("scheduled_at_kst") or e.get("scheduled_date") or ""))
 
 
-EARNINGS_IMPORTANCE = {"NVDA": 100, "AAPL": 98, "MSFT": 97, "AMZN": 96, "GOOGL": 95, "META": 94, "TSLA": 92, "AMD": 90, "AVGO": 88, "MU": 85, "TSM": 84}
+EARNINGS_IMPORTANCE = {
+    "NVDA": 100, "AAPL": 98, "MSFT": 97, "AMZN": 96, "GOOGL": 95, "META": 94,
+    "TSLA": 92, "AMD": 90, "AVGO": 88, "MU": 85, "TSM": 84,
+    "PAYX": 82, "CTAS": 80, "GIS": 72, "CBRL": 55, "SFIX": 45, "FUL": 40,
+}
 
 
 def _earnings_context(payload: dict, claims: list[dict]) -> dict:
