@@ -33,12 +33,14 @@ Narrative adapter는 Hermes/OpenAI/Grok 등으로 교체 가능하게 만든다.
 
 Production primary는 **현재 사용자 Windows PC가 아니라 외부 Linux VPS**로 둔다.
 
-권장 1순위:
-- AWS Lightsail Seoul (`ap-northeast-2`)
-- Ubuntu LTS
-- 시작 사양: 1 GB RAM / 2 vCPU ($7/mo) 가능
-- 권장 사양: **2 GB RAM / 2 vCPU ($12/mo)** — 로그/SQLite/여유 메모리 포함
-- 06:30 Morning + 21:00 + Open + Close + watchdog 정도에는 충분한 수준
+권장 1순위(Free Plan 실험 단계):
+- **Amazon EC2 Seoul (`ap-northeast-2`)**
+- Ubuntu LTS AMI
+- console에서 **Free tier eligible** 표시가 붙은 인스턴스만 선택
+- 신규 계정(2025-07-15 이후)은 `t3.micro`, `t3.small`, `t4g.micro`, `t4g.small` 등이 eligible 후보이며 실제 콘솔 표시를 정본으로 사용
+- 처음에는 `t3.micro` 또는 호환 가능한 가장 작은 eligible x86 인스턴스로 시작
+- 06:30 Morning + 21:00 + Open + Close + watchdog은 상시 고부하 서비스가 아니므로 초기 실험에 충분한지 shadow run으로 검증
+- Free Plan은 6개월 또는 credits 소진 전까지이며, 종료 전에 리소스 export/전환 결정을 한다
 
 현재 Windows PC의 역할:
 - Codex 개발
@@ -55,8 +57,8 @@ Production primary는 **현재 사용자 Windows PC가 아니라 외부 Linux VP
 - 집 네트워크/전원 의존
 
 대안:
-- Railway Hobby: cron deployment가 쉽고 $5 minimum, 운영 편의성 높음. 다만 persistent state/timezone/플랫폼 종속을 고려하면 1차 core는 VPS가 단순함.
-- Oracle Always Free: 비용 매력은 있으나 free resource availability/idle 정책 때문에 primary production 추천도는 낮음.
+- **AWS Lightsail**: Free Tier credits로 사용 가능하지만 별도 fixed-price 서비스라 Free Plan 실험 단계의 1순위는 EC2 eligible instance로 둔다.
+- Railway Hobby: cron deployment가 쉽지만 추가 과금 전제가 있어 지금 단계에서는 보류.
 - GitHub Actions: primary scheduler가 아니라 watchdog/CI 용도.
 
 서버에는 브라우저 자동화/Grok Bot/Cursor를 설치하지 않는다.
