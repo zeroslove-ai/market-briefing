@@ -337,7 +337,7 @@ def render_telegram_compact(payload: dict, max_chars: int = 2500) -> list[str]:
         f"🧭 {((payload.get('insight') or {}).get('conclusion') or '주요 자산의 흐름을 확인합니다.')}",
         "",
         "📊 Market Map",
-        *[f"{row['metric']} {row['value']} — {row['interpretation']}" for row in _telegram_map_rows(payload)],
+        *[f"{row['metric']} {row['value']} — {row['interpretation']}" if row['metric'] else row['interpretation'] for row in _telegram_map_rows(payload)],
     ]
     summary = _claim_lines(payload, 3)
     if summary:
@@ -391,7 +391,7 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
     mode_label = "Week Kickoff" if mode == "week_kickoff" else "Close Autopsy"
     insight = payload.get("insight") or {}
     conclusion = insight.get("conclusion") or "시장 흐름은 혼조이며 뚜렷한 단일 주도 요인은 확인되지 않았습니다."
-    short_conclusion = insight.get("subject_conclusion") or conclusion.split("。")[0].split(". ")[0][:62]
+    short_conclusion = (insight.get("subject_conclusion") or conclusion.split(". ")[0][:62]).strip()[:85]
     day = date_text[5:7].lstrip("0") + "/" + date_text[8:10].lstrip("0") if len(date_text) >= 10 else date_text
     subject = f"[미국증시 모닝] {short_conclusion} | {day} 06:30 KST"
 

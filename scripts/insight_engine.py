@@ -176,7 +176,7 @@ def build_insight(payload: dict, *, persist_queue: bool = False) -> dict:
             if semi is not None and spread is not None else
             "반도체와 S&P의 상대 강도 차이가 커졌습니다."
         )
-        rate_text = f" 10년물 {rates:+.0f}bp 하락은 성장주에 우호적입니다." if rates is not None and rates < 0 else f" 10년물 {rates:+.0f}bp 상승은 성장주 할인율 부담이 될 수 있습니다." if rates is not None and rates > 0 else ""
+        rate_text = f" 10년물 {rates:+.0f}bp 하락은 성장주에 우호적입니다." if rates is not None and rates <= -3 else f" 10년물 {rates:+.0f}bp 상승은 성장주 할인율 부담이 될 수 있습니다." if rates is not None and rates >= 3 else ""
         oil_text = (
             f" WTI {oil:+.1f}% 급락의 공급·수요 배경은 미확인입니다."
             if oil is not None and oil <= -4 else
@@ -193,7 +193,7 @@ def build_insight(payload: dict, *, persist_queue: bool = False) -> dict:
     rates = features.get("us10y_change_bp")
     oil = features.get("wti_change_pct")
     subject_parts = []
-    if semi is not None and spread is not None and spread > 0:
+    if semi is not None and spread is not None and spread >= 1.0:
         subject_parts.append(f"반도체 주도(SOXX {semi:+.1f}%, 상대 {spread:+.1f}pp)" if semi > 0 else f"반도체 상대 선방(SOXX {semi:+.1f}%, spread {spread:+.1f}pp)")
     if rates is not None and rates <= -3:
         subject_parts.append(f"10Y {rates:+.0f}bp 하락")
@@ -201,7 +201,7 @@ def build_insight(payload: dict, *, persist_queue: bool = False) -> dict:
         subject_parts.append(f"10Y {rates:+.0f}bp 상승")
     if oil is not None and abs(oil) >= 4:
         subject_parts.append(f"WTI {oil:+.1f}% 원인 미확인")
-    subject_conclusion = "; ".join(subject_parts) if subject_parts else conclusion.split("。")[0]
+    subject_conclusion = "; ".join(subject_parts) if subject_parts else conclusion.split(". ")[0][:62]
     watch = list(dict.fromkeys(claim["what_to_watch"] for claim in claims))[:5]
     if not watch:
         watch = ["주요 지수의 상승 폭과 장 초반 breadth", "다음 거시 일정과 금리 반응"]

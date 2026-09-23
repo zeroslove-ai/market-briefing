@@ -35,6 +35,8 @@ Each anomaly carries stable anomaly_id, severity, direction, metric, numeric val
 
 Claims are emitted only when observable conditions qualify. Required families include NARROW_GROWTH_RISK_ON, BROAD_RISK_ON, RISK_OFF_CONFIRMED, CROSS_ASSET_MIXED, RATES_TAILWIND_GROWTH, RATES_HEADWIND_GROWTH, VOLATILITY_EXPANSION, OIL_DISINFLATION_TAILWIND, OIL_DEMAND_SCARE, SEMI_LEADERSHIP, SMALL_CAP_LAG, and CRYPTO_CONFIRMATION. Optional SIGMA_OI_CONFIRMED / SIGMA_OI_CONFLICT are emitted only when Sigma/OI inputs exist.
 
+Claim cutoffs are independent from anomaly cutoffs: SEMI_LEADERSHIP requires SOXX to beat the S&P by at least 1.0 pp; RATES_TAILWIND_GROWTH / RATES_HEADWIND_GROWTH require a 10Y move of at least 3 bp in the matching direction and a Nasdaq move in the confirming direction. Conclusion and subject wording must meet these same cutoffs; sub-threshold rate changes are omitted from driver language.
+
 Every claim contains support, counter_evidence, confidence (HIGH / MEDIUM / LOW), affected_assets, what_to_watch, and interpretation_type. Co-movement is not proof of cause. The oil-tailwind claim therefore explicitly notes that a supply release and demand weakness imply different readings.
 
 ## Stories, evidence and research queue

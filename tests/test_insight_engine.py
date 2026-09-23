@@ -78,3 +78,24 @@ def test_unmatched_headlines_do_not_fill_story_slots():
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     payload["news"] = [{"title": "UN General Assembly photo gallery", "url": "https://example.test/gallery"}]
     assert build_insight(payload)["story_clusters"] == []
+
+
+def test_subject_and_conclusion_respect_semiconductor_and_rate_thresholds():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["indicators"]["equities"]["soxx"]["change_pct"] = 1.99
+    payload["indicators"]["rates"]["us10y"]["change"] = 0.004
+    insight = build_insight(payload)
+    assert "SEMI_LEADERSHIP" not in {claim["claim_id"] for claim in insight["claims"]}
+    assert "반도체 주도" not in insight["subject_conclusion"]
+    assert "10Y" not in insight["subject_conclusion"]
+    assert "+0bp" not in insight["conclusion"]
+
+
+def test_telegram_raw_fallback_has_no_empty_metric_prefix():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["insight"] = build_insight(payload)
+    telegram = "\n".join(render_telegram_compact(payload))
+    assert "S&P 500" in telegram
+    payload.pop("insight", None)
+    fallback = "\n".join(render_telegram_compact(payload))
+    assert " — 주식 S&P" not in fallback
