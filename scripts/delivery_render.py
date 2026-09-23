@@ -147,13 +147,26 @@ def _econ_lines(payload: dict, limit: int | None = None) -> list[str]:
                 pass
         title = item.get("title") or item.get("event") or "-"
         if not scheduled and item.get("status") == "scheduled_date_only":
-            match = re.match(r"(\d{4}-\d{2}-\d{2})\s+", title)
-            if match:
-                time_text = f"{match.group(1)} ET date (time TBA)"
-                title = title[match.end():]
-                date_only = True
+            date_value = item.get("scheduled_date")
+            if date_value:
+                try:
+                    from datetime import date
+                    parsed_date = date.fromisoformat(date_value)
+                    title = re.sub(r"^\d{4}-\d{2}-\d{2}\s+", "", title)
+                    time_text = f"{parsed_date.month}/{parsed_date.day} — {title}"
+                    date_only = True
+                except (TypeError, ValueError):
+                    pass
+            if not date_only:
+                match = re.match(r"(\d{4})-(\d{2})-(\d{2})\s+", title)
+                if match:
+                    time_text = f"{int(match.group(2))}/{int(match.group(3))} — {title[match.end():]}"
+                    date_only = True
         zone_label = "" if date_only else " KST"
-        lines.append(f"{time_text or '-'}{zone_label} | {title} {_importance(item.get('importance'))}{suffix}")
+        if date_only:
+            lines.append(f"{time_text} {_importance(item.get('importance'))}{suffix}")
+        else:
+            lines.append(f"{time_text or '-'}{zone_label} | {title} {_importance(item.get('importance'))}{suffix}")
     return lines
 
 

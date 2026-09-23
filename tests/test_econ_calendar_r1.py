@@ -32,11 +32,11 @@ def test_schedule_timestamps_are_dst_aware_and_kst_converted():
 def test_bls_ics_preserves_source_timezone_and_does_not_invent_time():
     fixture = """BEGIN:VCALENDAR
 BEGIN:VEVENT
-DTSTART;TZID=America/New_York:20260923T083000
+DTSTART;VALUE=DATE;TZID=America/New_York:20260923T083000
 SUMMARY:Employment Situation
 END:VEVENT
 BEGIN:VEVENT
-DTSTART;VALUE=DATE:20260924
+DTSTART;TZID=America/New_York:20260924
 SUMMARY:Employment Situation day marker
 END:VEVENT
 END:VCALENDAR"""
@@ -44,6 +44,14 @@ END:VCALENDAR"""
     assert events[0]["scheduled_at"].endswith("-04:00")
     assert events[1]["scheduled_at"] is None
     assert events[1]["status"] == "scheduled_date_only"
+    assert events[1]["scheduled_date"] == "2026-09-24"
+
+
+def test_yearless_schedule_dates_resolve_to_years_inside_requested_window():
+    fixture = "<div>December 31 8:30 AM News Year-end event January 1 8:30 AM News New Year event</div>"
+    events = parse_bea_schedule(fixture, 2026, date(2026, 12, 31), date(2027, 1, 1))
+    assert [event["scheduled_date"] for event in events] == ["2026-12-31", "2027-01-01"]
+    assert all(event["scheduled_date"] is not None for event in events)
 
 
 def test_kst_date_rollover_resolves_target_us_session():
@@ -74,7 +82,7 @@ def test_bea_and_census_duplicate_trade_event_prefers_first_official_source():
     assert trade[0]["source"] == "BEA"
     assert set(trade[0]) == {
         "event_id", "source", "source_tier", "source_url", "event_type", "title",
-        "scheduled_at", "scheduled_at_kst", "importance", "previous", "forecast",
+        "scheduled_at", "scheduled_at_kst", "scheduled_date", "importance", "previous", "forecast",
         "actual", "unit", "status",
     }
 
@@ -115,11 +123,16 @@ def test_calendar_source_failure_isolated_and_morning_artifact_has_fixture_event
     assert len(errors) == len(SOURCES) - 1
 
     import morning_delivery
-    monkeypatch.setattr(morning_delivery, "collect_econ_events", lambda start, end: (events, errors))
+    requested_window = []
+    def collect_for_window(start, end):
+        requested_window.append((start, end))
+        return events, errors
+    monkeypatch.setattr(morning_delivery, "collect_econ_events", collect_for_window)
     monkeypatch.setattr(morning_delivery, "collect_market_board", lambda cache: {"indicators": {}, "data_quality": []})
     monkeypatch.setattr(morning_delivery, "collect_news", lambda: [])
     monkeypatch.setattr(morning_delivery, "collect_earnings", lambda session: [])
     payload = morning_delivery.build_morning_payload(datetime(2026, 9, 23, 6, 30, tzinfo=KST))
+    assert requested_window == [(date(2026, 9, 23), date(2026, 9, 23))]
     telegram = "\n".join(morning_delivery.render_telegram_compact(payload))
     assert "Personal Income and Outlays" in telegram
     assert "21:30 KST" in telegram

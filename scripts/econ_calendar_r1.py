@@ -81,14 +81,15 @@ def _event(source: str, title: str, when: datetime | None, *, event_type="econom
     else:
         when_iso = kst_iso = None
     name = re.sub(r"\s+", " ", title).strip(" -|\t")
-    identity_date = (scheduled_date or date.min).isoformat()
+    canonical_date = scheduled_date.isoformat() if scheduled_date else None
+    identity_date = canonical_date or "undated"
     digest = hashlib.sha256(f"{source}|{identity_date}|{event_type}|{name.lower()}".encode()).hexdigest()[:20]
     return {
         "event_id": digest, "source": source, "source_tier": tier, "source_url": url,
         "event_type": event_type, "title": name, "scheduled_at": when_iso,
-        "scheduled_at_kst": kst_iso, "importance": importance, "previous": None,
+        "scheduled_at_kst": kst_iso, "scheduled_date": canonical_date,
+        "importance": importance, "previous": None,
         "forecast": None, "actual": None, "unit": None, "status": "scheduled" if when_iso else "scheduled_date_only",
-        "_scheduled_date": identity_date,
     }
 
 
@@ -104,20 +105,36 @@ def parse_bls_ics(raw: str) -> list[dict]:
             start_key = next((key for key in props if key.startswith("DTSTART")), None)
             if not summary or not start_key:
                 continue
-            raw_dt = props[start_key]
+            raw_dt = props[start_key].strip()
+            day = None
             try:
-                if "VALUE=DATE" in start_key or re.fullmatch(r"\d{8}", raw_dt):
+                # DTSTART value shape is authoritative; parameters are only a
+                # fallback for nonstandard values.
+                if re.fullmatch(r"\d{8}", raw_dt):
                     day = datetime.strptime(raw_dt[:8], "%Y%m%d").date()
                     when = None
                 else:
-                    parsed = datetime.strptime(raw_dt[:15], "%Y%m%dT%H%M%S")
-                    tz_match = re.search(r"TZID=([^;:]+)", start_key)
-                    if raw_dt.endswith("Z"):
-                        from datetime import timezone
-                        zone = timezone.utc
+                    stamp = re.fullmatch(r"(\d{8}T\d{4})(\d{2})?(Z)?", raw_dt)
+                    if stamp:
+                        fmt = "%Y%m%dT%H%M%S" if stamp.group(2) else "%Y%m%dT%H%M"
+                        parsed = datetime.strptime(stamp.group(1) + (stamp.group(2) or ""), fmt)
+                    elif "VALUE=DATE" in start_key:
+                        day = datetime.strptime(raw_dt[:8], "%Y%m%d").date()
+                        parsed = None
                     else:
-                        zone = ET if not tz_match or tz_match.group(1) == "America/New_York" else __import__("zoneinfo").ZoneInfo(tz_match.group(1))
-                    when = parsed.replace(tzinfo=zone)
+                        parsed = datetime.strptime(raw_dt[:15], "%Y%m%dT%H%M%S")
+                    if parsed is None:
+                        when = None
+                    else:
+                        tz_match = re.search(r"TZID=([^;:]+)", start_key)
+                        if stamp and stamp.group(3):
+                            from datetime import timezone
+                            zone = timezone.utc
+                        elif tz_match:
+                            zone = ET if tz_match.group(1) == "America/New_York" else __import__("zoneinfo").ZoneInfo(tz_match.group(1))
+                        else:
+                            zone = ET
+                        when = parsed.replace(tzinfo=zone)
                 events.append(_event(
                     "BLS", summary.replace(r"\,", ",").replace(r"\;", ";"), when,
                     event_type="labor", scheduled_date=day if when is None else None,
@@ -135,8 +152,20 @@ _DATE = re.compile(r"\b(January|February|March|April|May|June|July|August|Septem
 _TIME = re.compile(r"\b(\d{1,2}:\d{2}\s*[AP]M|\d{1,2}\s*[AP]M)\b", re.I)
 
 
-def _parse_date(match, default_year: int) -> date:
-    return date(int(match.group(3) or default_year), _MONTHS[match.group(1).lower()], int(match.group(2)))
+def _parse_date(match, default_year: int, start: date | None = None, end: date | None = None) -> date | None:
+    month, day_num = _MONTHS[match.group(1).lower()], int(match.group(2))
+    if match.group(3):
+        return date(int(match.group(3)), month, day_num)
+    if start is None or end is None:
+        return date(default_year, month, day_num)
+    for year in range(start.year, end.year + 1):
+        try:
+            candidate = date(year, month, day_num)
+        except ValueError:
+            continue
+        if start <= candidate <= end:
+            return candidate
+    return None
 
 
 def _event_type(title: str) -> str:
@@ -156,16 +185,19 @@ def _event_type(title: str) -> str:
     return "economic"
 
 
-def _events_from_text(source: str, text: str, default_year: int, *, allow_date_only=False) -> list[dict]:
+def _events_from_text(source: str, text: str, default_year: int, *, start: date | None = None,
+                      end: date | None = None, allow_date_only=False) -> list[dict]:
     events = []
     dates = list(_DATE.finditer(text))
     for index, match in enumerate(dates):
         try:
-            day = _parse_date(match, default_year)
+            day = _parse_date(match, default_year, start, end)
         except ValueError:
             continue
-        end = dates[index + 1].start() if index + 1 < len(dates) else min(len(text), match.end() + 350)
-        following = text[match.end():end]
+        if day is None:
+            continue
+        end_index = dates[index + 1].start() if index + 1 < len(dates) else min(len(text), match.end() + 350)
+        following = text[match.end():end_index]
         time_match = _TIME.search(following)
         if not time_match and not allow_date_only:
             continue
@@ -189,17 +221,17 @@ def _events_from_text(source: str, text: str, default_year: int, *, allow_date_o
     return events
 
 
-def parse_bea_schedule(raw: str, default_year: int) -> list[dict]:
+def parse_bea_schedule(raw: str, default_year: int, start: date | None = None, end: date | None = None) -> list[dict]:
     text, rows = _html_text(raw)
-    events = _events_from_text("BEA", text, default_year)
+    events = _events_from_text("BEA", text, default_year, start=start, end=end)
     # BEA schedule cards can run together in the flattened page; row extraction
     # retains each release when the source presents a table.
     if rows:
-        events.extend(_events_from_text("BEA", " | ".join(rows), default_year))
+        events.extend(_events_from_text("BEA", " | ".join(rows), default_year, start=start, end=end))
     return events
 
 
-def parse_census_calendar(raw: str, default_year: int) -> list[dict]:
+def parse_census_calendar(raw: str, default_year: int, start: date | None = None, end: date | None = None) -> list[dict]:
     text, rows = _html_text(raw)
     events = []
     for row in rows:
@@ -214,18 +246,20 @@ def parse_census_calendar(raw: str, default_year: int) -> list[dict]:
         if not title:
             continue
         try:
-            day = _parse_date(match, default_year)
+            day = _parse_date(match, default_year, start, end)
+            if day is None:
+                continue
             clock = datetime.strptime(time_match.group(1).upper().replace(" ", ""), "%I:%M%p" if ":" in time_match.group(1) else "%I%p").time()
             events.append(_event("Census", title, datetime.combine(day, clock, ET), event_type=_event_type(title),
                                  importance=3 if _event_type(title) in {"trade", "gdp"} else 2))
         except ValueError:
             continue
     if not events:
-        events = _events_from_text("Census", text, default_year)
+        events = _events_from_text("Census", text, default_year, start=start, end=end)
     return events
 
 
-def parse_fed_calendar(raw: str, default_year: int) -> list[dict]:
+def parse_fed_calendar(raw: str, default_year: int, start: date | None = None, end: date | None = None) -> list[dict]:
     text, rows = _html_text(raw)
     events = []
     for segment in rows or re.split(r"[|;]", text):
@@ -233,8 +267,10 @@ def parse_fed_calendar(raw: str, default_year: int) -> list[dict]:
         if not match or not re.search(r"FOMC|Federal Open Market|speech|testimony|meeting", segment, re.I):
             continue
         try:
-            day = _parse_date(match, default_year)
+            day = _parse_date(match, default_year, start, end)
         except ValueError:
+            continue
+        if day is None:
             continue
         time_match = _TIME.search(segment)
         when = None
@@ -266,8 +302,10 @@ def parse_eia_schedule(raw: str, start: date, end: date) -> list[dict]:
         if len(dates) < 2:
             continue
         try:
-            released = _parse_date(dates[1], start.year)
+            released = _parse_date(dates[1], start.year, start, end)
         except ValueError:
+            continue
+        if released is None:
             continue
         clock = _TIME.search(row[dates[1].end():]) or _TIME.search(row)
         if not clock:
@@ -335,9 +373,9 @@ def parse_ism_calendar(raw: str, default_year: int) -> list[dict]:
 
 ADAPTERS = {
     "BLS": lambda raw, start, end: parse_bls_ics(raw),
-    "BEA": lambda raw, start, end: parse_bea_schedule(raw, start.year),
-    "Census": lambda raw, start, end: parse_census_calendar(raw, start.year),
-    "Federal Reserve": lambda raw, start, end: parse_fed_calendar(raw, start.year),
+    "BEA": lambda raw, start, end: parse_bea_schedule(raw, start.year, start, end),
+    "Census": lambda raw, start, end: parse_census_calendar(raw, start.year, start, end),
+    "Federal Reserve": lambda raw, start, end: parse_fed_calendar(raw, start.year, start, end),
     "EIA": parse_eia_schedule,
     "Treasury": lambda raw, start, end: parse_treasury_schedule(raw, start.year),
     "ISM": lambda raw, start, end: parse_ism_calendar(raw, start.year),
@@ -345,7 +383,7 @@ ADAPTERS = {
 
 
 def _dedupe_key(event: dict) -> tuple:
-    day = event.get("_scheduled_date", "")
+    day = event.get("scheduled_date", "")
     title = event.get("title", "").lower()
     kind = event.get("event_type")
     # BEA and Census can publish the same GDP/trade release; canonicalize title aliases.
@@ -367,7 +405,9 @@ def collect_econ_events(start: date, end: date, *, fetcher: Callable[[str], str]
             raw = fetcher(url)
             parsed = ADAPTERS[source](raw, start, end)
             for event in parsed:
-                day = date.fromisoformat(event["_scheduled_date"])
+                if not event.get("scheduled_date"):
+                    continue
+                day = date.fromisoformat(event["scheduled_date"])
                 if start <= day <= end:
                     all_events.append(event)
         except Exception as error:
@@ -380,6 +420,6 @@ def collect_econ_events(start: date, end: date, *, fetcher: Callable[[str], str]
             winners[key] = event
     output = []
     for event in winners.values():
-        output.append({key: value for key, value in event.items() if not key.startswith("_")})
+        output.append(event)
     output.sort(key=lambda item: (item["scheduled_at"] is None, item["scheduled_at"] or item["title"], item["source"]))
     return output, errors

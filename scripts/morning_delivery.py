@@ -80,7 +80,7 @@ def build_morning_payload(now: datetime | None = None) -> dict:
     flow_state = read_json(state_path("option", "flow_signals.json"), {}) or {}
 
     next_session = next_regular_session(upcoming_session)
-    econ, econ_errors = collect_econ_events(upcoming_session, next_session)
+    econ, econ_errors = collect_econ_events(upcoming_session, upcoming_session)
     payload = {
         "schema_version": 1,
         "generated_at": utc_now_iso(),

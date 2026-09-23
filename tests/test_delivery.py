@@ -77,6 +77,21 @@ def test_telegram_calendar_fallback_still_labels_kst():
     assert "경제 캘린더 소스 확인 필요" in text
 
 
+def test_date_only_events_render_calendar_date_without_kst_label():
+    payload = sample_payload()
+    payload["econ_calendar"] = [{
+        "scheduled_at": None,
+        "scheduled_at_kst": None,
+        "scheduled_date": "2026-09-24",
+        "status": "scheduled_date_only",
+        "title": "2026-09-24 Treasury auction",
+        "importance": 2,
+    }]
+    lines = delivery_render._econ_lines(payload)
+    assert lines == ["9/24 — Treasury auction ★★"]
+    assert "KST" not in lines[0]
+
+
 def test_email_full_and_telegram_use_same_payload_facts():
     payload = sample_payload()
     subject, plain, html = delivery_render.render_email_full(payload)
