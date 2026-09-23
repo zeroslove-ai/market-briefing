@@ -14,6 +14,8 @@ state/market_snapshot_latest.json
 state/report_snapshots/*.json
 state/report_history/*.jsonl
 state/option/*.json
+state/delivery/ledger.json
+state/delivery/artifacts/
 
 # 환경/비밀값
 .env

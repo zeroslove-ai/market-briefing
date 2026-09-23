@@ -7,7 +7,7 @@ close : 61종 옵션 콜/풋 OI 증감 감지 + 자체 컨빅션 스코어 + 1σ
         (샘플 형식: 백드롭 → 🟢/🔴 신호 → 결과 → 비정상 OI 감지)
 
 모든 소스 무료(실측 검증): CBOE 지연 옵션 API, Yahoo chart, Nasdaq 실적,
-CNBC RSS, investing.com 경제 캘린더. stdout JSON → 크론 LLM이 한국어 브리핑 가공.
+CNBC RSS, 공식 기관 경제 캘린더. stdout JSON → 크론 LLM이 한국어 브리핑 가공.
 
 용법: python option_flow_report.py open|close
 """
@@ -24,6 +24,7 @@ import time
 
 from market_clock import ET, KST, get_market_clock
 from market_data import RunCache, cboe_chain_summary, fetch_url, yahoo_chart_quote, yahoo_daily_last as shared_yahoo_daily_last
+from econ_calendar_r1 import collect_econ_events
 from report_snapshots import persist_report_snapshot
 from state_store import atomic_write_json, commit_oi_close, load_flow_signals, load_oi_baseline, read_json, state_path
 
@@ -169,34 +170,9 @@ def collect_news():
 
 
 def collect_econ():
-    econ = []
-    try:
-        htm = fetch("https://www.investing.com/economic-calendar/", timeout=25).decode("utf-8", "replace")
-        objs = re.findall(r'\{[^{}]*?"event"[^{}]*?\}', htm)
-        now = datetime.now(timezone.utc)
-        for o in objs:
-            try:
-                ev = json.loads(o)
-                if ev.get("currency") != "USD" or int(ev.get("importance") or 0) < 2:
-                    continue
-                t = ev.get("time", "")
-                if not t:
-                    continue
-                et = datetime.fromisoformat(t.replace("Z", "+00:00"))
-                if et < now - timedelta(hours=6) or et > now + timedelta(days=2):
-                    continue
-                econ.append({
-                    "time": et.astimezone(KST).strftime("%m-%d %H:%M"),
-                    "event": ev.get("event", ""), "importance": ev.get("importance"),
-                    "actual": ev.get("actual", ""), "forecast": ev.get("forecast", ""),
-                    "previous": ev.get("previous", ""),
-                })
-            except Exception:
-                continue
-        econ.sort(key=lambda x: x["time"])
-        return econ[:15]
-    except Exception as e:
-        return [{"error": str(e)[:60]}]
+    day = get_market_clock("open").market_session_date
+    events, _errors = collect_econ_events(day, day)
+    return events
 
 
 def main(mode):
@@ -308,6 +284,9 @@ def main(mode):
         top_bull = [s for s in signals if s["direction"] == "bullish"][:4]
         top_bear = [s for s in signals if s["direction"] == "bearish"][:4]
         out["signals"] = top_bull + top_bear
+        # Preserve the close option map in latest_close.json for the morning
+        # delivery renderer; the dedicated OI snapshot remains the baseline authority.
+        out["options"] = option_data
         anomalies.sort(key=lambda x: x["oi_chg_pct"], reverse=True)
         out["oi_anomalies"] = anomalies
 

@@ -11,11 +11,12 @@ import argparse
 import html
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from market_board import collect_market_board
 from market_clock import KST, get_market_clock
 from market_data import RunCache, cboe_chain_summary, fetch_url, yahoo_chart_quote
+from econ_calendar_r1 import collect_econ_events
 from report_snapshots import persist_report_snapshot
 from state_store import load_oi_baseline
 
@@ -66,33 +67,11 @@ def collect_news():
     return news
 
 
-def collect_econ():
-    events = []
-    try:
-        html_text = fetch("https://www.investing.com/economic-calendar/", timeout=20).decode("utf-8", "replace")
-        now = datetime.now(timezone.utc)
-        for raw in re.findall(r'\{[^{}]*?"event"[^{}]*?\}', html_text):
-            try:
-                event = json.loads(raw)
-                if event.get("currency") != "USD" or int(event.get("importance") or 0) < 2:
-                    continue
-                timestamp = event.get("time")
-                if not timestamp:
-                    continue
-                when = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                if when < now - timedelta(hours=6) or when > now + timedelta(days=2):
-                    continue
-                events.append({
-                    "time": when.astimezone(KST).strftime("%m-%d %H:%M"),
-                    "event": event.get("event", ""), "importance": int(event.get("importance") or 0),
-                    "actual": event.get("actual", ""), "forecast": event.get("forecast", ""),
-                    "previous": event.get("previous", ""),
-                })
-            except Exception:
-                continue
-        return sorted(events, key=lambda item: item["time"])[:15]
-    except Exception as error:
-        return [{"error": str(error)[:80]}]
+def collect_econ(session_date: date | None = None):
+    """Legacy-compatible wrapper; returns official calendar events only."""
+    session_date = session_date or datetime.now().astimezone().date()
+    events, _errors = collect_econ_events(session_date, session_date)
+    return events
 
 
 def _cboe_option_data(symbol, yahoo, cache):
@@ -134,7 +113,7 @@ def main(phase=None):
         "trending": [],
         "earnings": collect_earnings(clock.market_session_date),
         "news": collect_news(),
-        "econ_calendar": collect_econ(),
+        "econ_calendar": collect_econ(clock.market_session_date),
     }
     try:
         trending_doc = json.loads(fetch("https://query1.finance.yahoo.com/v1/finance/trending/US"))

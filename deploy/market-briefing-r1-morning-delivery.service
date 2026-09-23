@@ -1,0 +1,11 @@
+[Unit]
+Description=Market Briefing R1 06:30 artifacts + Telegram delivery
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/market-briefing
+EnvironmentFile=/etc/market-briefing/delivery.env
+ExecStart=/opt/market-briefing/.venv/bin/python /opt/market-briefing/scripts/morning_delivery.py --send
