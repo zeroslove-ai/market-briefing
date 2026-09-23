@@ -9,7 +9,7 @@ import os
 from datetime import datetime, time
 from pathlib import Path
 
-from delivery_adapters import send_gmail_smtp, send_telegram
+from delivery_adapters import send_telegram
 from delivery_render import render_email_full, render_telegram_compact
 from market_board import collect_market_board
 from market_clock import KST, last_actual_regular_session, next_regular_session, now_kst
@@ -84,11 +84,20 @@ def write_artifacts(payload: dict) -> dict:
         "payload": base / f"{mode}-payload.json",
         "email_plain": base / f"{mode}-email.txt",
         "email_html": base / f"{mode}-email.html",
+        "gmail_mcp": base / f"{mode}-gmail-mcp.json",
         "telegram": base / f"{mode}-telegram.txt",
     }
     atomic_write_json(paths["payload"], payload)
     paths["email_plain"].write_text(plain + "\n", encoding="utf-8")
     paths["email_html"].write_text(html + "\n", encoding="utf-8")
+    atomic_write_json(paths["gmail_mcp"], {
+        "provider": "gmail_mcp",
+        "recipient_strategy": "authenticated_profile_self",
+        "subject": subject,
+        "body": plain,
+        "html_body": html,
+        "content_type": "text/plain",
+    })
     paths["telegram"].write_text("\n\n--- MESSAGE BREAK ---\n\n".join(telegram_messages) + "\n", encoding="utf-8")
     return {"subject": subject, "plain": plain, "html": html, "telegram": telegram_messages, "paths": {k: str(v) for k, v in paths.items()}}
 
@@ -119,48 +128,22 @@ def mark_delivery(payload: dict, channel: str, status: str, detail: str = "") ->
     atomic_write_json(path, {"schema_version": 1, "generated_at": utc_now_iso(), "deliveries": deliveries})
 
 
-def _recipients(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def deliver(payload: dict, rendered: dict, *, force: bool = False) -> dict:
-    results = {}
+def deliver_telegram(payload: dict, rendered: dict, *, force: bool = False) -> dict:
+    """EC2-owned direct delivery. Email is handed off to Gmail MCP separately."""
     if not force and already_sent(payload, "telegram"):
-        results["telegram"] = "already_sent"
-    else:
-        try:
-            send_telegram(
-                rendered["telegram"],
-                bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-                chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
-                thread_id=os.environ.get("TELEGRAM_MESSAGE_THREAD_ID") or None,
-            )
-            mark_delivery(payload, "telegram", "sent")
-            results["telegram"] = "sent"
-        except Exception as error:
-            mark_delivery(payload, "telegram", "failed", str(error))
-            results["telegram"] = f"failed: {error}"
-
-    if not force and already_sent(payload, "email"):
-        results["email"] = "already_sent"
-    else:
-        try:
-            send_gmail_smtp(
-                subject=rendered["subject"],
-                plain=rendered["plain"],
-                html=rendered["html"],
-                smtp_user=os.environ.get("GMAIL_SMTP_USER", ""),
-                app_password=os.environ.get("GMAIL_APP_PASSWORD", ""),
-                recipients=_recipients(os.environ.get("EMAIL_TO", "")),
-                sender=os.environ.get("EMAIL_FROM") or None,
-            )
-            mark_delivery(payload, "email", "sent")
-            results["email"] = "sent"
-        except Exception as error:
-            mark_delivery(payload, "email", "failed", str(error))
-            results["email"] = f"failed: {error}"
-    return results
-
+        return {"telegram": "already_sent", "email": "gmail_mcp_handoff"}
+    try:
+        send_telegram(
+            rendered["telegram"],
+            bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+            chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
+            thread_id=os.environ.get("TELEGRAM_MESSAGE_THREAD_ID") or None,
+        )
+        mark_delivery(payload, "telegram", "sent")
+        return {"telegram": "sent", "email": "gmail_mcp_handoff"}
+    except Exception as error:
+        mark_delivery(payload, "telegram", "failed", str(error))
+        return {"telegram": f"failed: {error}", "email": "gmail_mcp_handoff"}
 
 def parse_now(value: str | None) -> datetime | None:
     if not value:
@@ -173,7 +156,7 @@ def parse_now(value: str | None) -> datetime | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--send", action="store_true", help="Actually deliver; default is artifact-only dry-run.")
+    parser.add_argument("--send", action="store_true", help="Send Telegram only; Gmail remains an MCP/Work handoff.")
     parser.add_argument("--force", action="store_true", help="Override delivery ledger duplicate protection.")
     parser.add_argument("--now", help="Offset-aware ISO timestamp for testing.")
     args = parser.parse_args()
@@ -196,7 +179,7 @@ def main() -> int:
         "telegram_messages": len(rendered["telegram"]),
     }
     if args.send:
-        result["delivery"] = deliver(payload, rendered, force=args.force)
+        result["delivery"] = deliver_telegram(payload, rendered, force=args.force)
         if any(str(value).startswith("failed:") for value in result["delivery"].values()):
             result["status"] = "partial_failure"
             print(json.dumps(result, ensure_ascii=False, indent=2))
