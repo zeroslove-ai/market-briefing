@@ -17,12 +17,13 @@ Hermes Agent가 **무료 데이터 소스만으로** 미국 증시와 옵션플�
 2. [`docs/hermes-news-intelligence-r1.md`](docs/hermes-news-intelligence-r1.md) — 뉴스/SEC/Fed/거시 이벤트 정본
 3. [`docs/hermes-korean-explanation-r1.md`](docs/hermes-korean-explanation-r1.md) — 중급자 한국어 설명 + 초보자 보조 해설
 4. [`docs/runtime-orchestration-r1.md`](docs/runtime-orchestration-r1.md) — Hermes/Codex/Cursor/Grok Bot/Aside 역할 분담 및 안정 운영 정본
-5. [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — Weekly Sigma 계산 정본
-6. [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 실제 PR 구현 순서
-7. [`docs/hermes-sigma-briefing-contract.md`](docs/hermes-sigma-briefing-contract.md) — 기존 4종 보고 + 깊은 설명 규칙
-8. [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 비전문가용 쉬운 해설
-9. [`docs/hermes-sigma-task-board.md`](docs/hermes-sigma-task-board.md) — 실행 작업보드
-10. [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션 인수인계
+5. [`docs/delivery-contract-r1.md`](docs/delivery-contract-r1.md) — 06:30 이메일 Full + 텔레그램 Compact 이중 전달 정본
+6. [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — Weekly Sigma 계산 정본
+7. [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 실제 PR 구현 순서
+8. [`docs/hermes-sigma-briefing-contract.md`](docs/hermes-sigma-briefing-contract.md) — 기존 4종 보고 + 깊은 설명 규칙
+9. [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 비전문가용 쉬운 해설
+10. [`docs/hermes-sigma-task-board.md`](docs/hermes-sigma-task-board.md) — 실행 작업보드
+11. [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션 인수인계
 
 > 구현 순서는 **R1-0 Data Integrity Foundation -> Sigma + News/Event Intelligence -> Evidence Engine -> 4종 보고 통합**입니다. 기존 production 보고는 단계별 회귀 테스트로 유지합니다.
 
