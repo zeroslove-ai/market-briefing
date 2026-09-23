@@ -86,4 +86,49 @@ https://cdn.cboe.com/api/global/delayed_quotes/options/{SYMBOL}.json
 | Twelve Data (무료) | 지수는 Grow/Venture 유료 플랜 전용 (404) |
 | Yahoo `/calendar/earnings` | Not Found |
 | Yahoo `/v7/finance/quote` | Unauthorized |
-| BLS 사이트 | 403 |
+| BLS 일반 웹 스크랩 | 과거 403 사례. **Public Data API는 별도 공식 경로로 사용 가능** |
+
+## R1 공식 소스 확장 후보 — 2026-09-23 공식 문서 확인, 코드 통합 전
+
+아래는 기존 production 소스가 아니라 **R1 News/Event Intelligence에 추가할 공식 1차 소스**다. 공식 문서/페이지 접근 가능 여부를 2026-09-23 재확인했으며, 실제 Hermes adapter 구현/부하 테스트는 Issue #4에서 진행한다.
+
+### SEC EDGAR
+
+- Developer/API: https://www.sec.gov/search-filings/edgar-application-programming-interfaces
+- Company submissions: `https://data.sec.gov/submissions/CIK##########.json`
+- Ticker/CIK mapping: https://www.sec.gov/files/company_tickers.json
+- 인증/API key 불필요
+- filings는 하루 중 계속 업데이트됨
+- R1 대상: 8-K, 10-Q, 10-K, 6-K, 20-F, 자금조달 관련 filing
+- 반드시 SEC fair-access/User-Agent 정책을 준수할 것
+
+### Federal Reserve
+
+- News & Events: https://www.federalreserve.gov/newsevents.htm
+- RSS index: https://www.federalreserve.gov/feeds/feeds.htm
+- all press releases feed: https://www.federalreserve.gov/feeds/press_all.xml
+- R1 대상: FOMC statement/projections/minutes, press release, speech/testimony
+
+### BLS Public Data API
+
+- Developer docs: https://www.bls.gov/developers/
+- v1은 registration/key 없이 제한된 공개 사용 가능
+- v2는 registration 권장/확장 기능
+- R1 대상: CPI, payroll, unemployment, wages 등 공식 결과값
+- 과거 `bls.gov` 일반 페이지 scraping 403 기록과 **API 사용 가능 여부는 별개**다.
+
+### BEA
+
+- Current releases: https://www.bea.gov/news/current-releases
+- Release schedule: https://www.bea.gov/news/schedule
+- R1 대상: GDP, PCE/Personal Income and Outlays, trade, corporate profits
+
+### Source authority policy
+
+R1 뉴스/이벤트는 기본적으로:
+
+1. 공식 1차 source(SEC/Fed/BLS/BEA)
+2. 기존 CNBC 등 시장 뉴스
+3. Yahoo Trending 등 discovery
+
+순으로 canonical source를 정한다. 동일 사건의 여러 기사는 story cluster로 합치고, 공식 원문이 있으면 공식 원문을 사실 정본으로 사용한다.
