@@ -3,7 +3,7 @@
 Status: OUTPUT AUTHORITY (R1)
 Parent authority: `docs/hermes-integrated-intelligence-r1.md`
 
-이 문서는 기존 Hermes 4종 보고의 정보를 유지하면서 Sigma, OI, breadth, cross-asset, event evidence를 하나의 설명으로 합치는 규칙을 정의한다.
+이 문서는 기존 Hermes 4종 보고의 정보를 유지하면서 Sigma, OI, breadth, cross-asset, 뉴스/공시/거시 이벤트 evidence를 하나의 설명으로 합치는 규칙을 정의한다. 기본 독자는 **주식 중급자**다.
 
 ## 1. 공통 규칙
 
@@ -22,7 +22,7 @@ Parent authority: `docs/hermes-integrated-intelligence-r1.md`
 
 ### Layer 1 — 30초 요약
 
-3~5문장. 전문용어 최소화.
+3~5문장. 전문용어를 억지로 제거하지 않는다. 대신 핵심 시장 구조와 촉매를 먼저 말하고, 숫자의 의미를 짧게 해설한다.
 
 반드시 포함할 수 있는 질문:
 
@@ -33,7 +33,12 @@ Parent authority: `docs/hermes-integrated-intelligence-r1.md`
 
 ### Layer 2 — 해설
 
-핵심 움직임 2~5개를 쉬운 말로 설명한다.
+핵심 움직임 2~5개를 **What -> Why it matters -> Confirmation -> Caveat/Watch** 순서로 설명한다.
+
+- What: 실제 변화
+- Why: 시장 메커니즘상 왜 중요한지
+- Confirmation: Sigma/OI/breadth/cross-asset/news 중 동조 근거
+- Caveat/Watch: 반대 근거 또는 다음 확인 조건
 
 예:
 
@@ -205,7 +210,50 @@ Confidence 자체를 매번 노출할 필요는 없지만, 결론이 불확실�
 
 가격 움직임 시간과 맞지 않거나 관련성이 낮으면 주요 원인으로 쓰지 않는다.
 
-## 13. 데이터 품질
+## 13. News / Filing / Macro Event 출력 규칙
+
+뉴스 상세 정본은 `docs/hermes-news-intelligence-r1.md`를 따른다.
+
+핵심 story는 단순 요약 대신 최대 4개 요소로 쓴다.
+
+```text
+[종목/시장] 사건명
+- 핵심: 공식 사실 또는 기사 핵심
+- 왜 중요: 실적/밸류에이션/섹터/금리 메커니즘
+- 시장 반응: 종목 vs 섹터/지수 + Sigma/OI가 있으면 연결
+- 체크: 다음 세션 확인 조건
+```
+
+예:
+
+> **[반도체] 수출 규제 업데이트**
+> - 핵심: 공식 규제 내용이 업데이트됐습니다.
+> - 왜 중요: AI 가속기 매출의 지역별 판매 가능 범위와 성장 기대에 직접 연결됩니다.
+> - 시장 반응: SOXX -1.4%, 관련 종목 다수가 하단 Sigma 쪽으로 이동했습니다.
+> - 체크: 개별 종목의 -1σ 이탈이 유지되는지와 put OI 동조 여부를 봅니다.
+
+source tier를 내부 payload에 보존한다.
+
+- Tier A: SEC/Fed/BLS/BEA 등 공식
+- Tier B: CNBC 등 시장 뉴스
+- Tier C: Trending/discovery
+
+공식 원문이 있으면 공식 source를 먼저 설명하고 언론은 맥락 보조로 사용한다.
+
+같은 사건의 반복 헤드라인은 story cluster 하나로 합친다.
+
+### 중급자용 시장 메커니즘 부연 기준
+
+- 금리: bp 변화와 성장주/금융주에 미치는 방향을 설명하되 자동 인과 단정 금지
+- VIX: 절대 수준보다 변화 방향과 속도도 설명
+- DXY: risk appetite와 다국적 기업 환산 효과를 구분
+- Oil: 에너지 직접효과와 물가 기대 간접효과 구분
+- breadth: 지수 표면과 개별 종목 내부의 괴리를 설명
+- IV: “불안하다”가 아니라 옵션시장이 가격에 반영한 기대 변동성임을 설명
+- OI: 체결 방향 데이터가 아니므로 포지션 증가의 흔적으로만 표현
+- relative return: 종목 고유 재료와 시장 베타를 구분하는 보조 근거로 사용
+
+## 14. 데이터 품질
 
 예:
 
@@ -215,7 +263,7 @@ Confidence 자체를 매번 노출할 필요는 없지만, 결론이 불확실�
 
 없는 값은 추정하지 않는다.
 
-## 14. 최종 TL;DR
+## 15. 최종 TL;DR
 
 최대 2문장.
 
