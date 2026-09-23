@@ -72,14 +72,22 @@ def rank_and_cluster_news(news: list[dict], anomalies: list[dict], claims: list[
         claim_topics.update(str(x) for x in claim.get("affected_assets", []))
     grouped: dict[str, list[dict]] = defaultdict(list)
     for item in news or []:
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or item.get("error"):
+            continue
+        raw_title = str(item.get("title_ko") or item.get("title") or "").strip()
+        if not raw_title or raw_title == "-":
             continue
         text = _text(item)
         title = " ".join((str(item.get("title_ko") or ""), str(item.get("title") or ""))).lower()
         scores = _topic_scores(title)
         relevance = sum(min(score, 4) + (2 if topic in anomaly_topics else 0) for topic, score in scores.items() if score)
         relevant_assets = [topic for topic, score in scores.items() if score]
-        if any(topic in claim_topics for topic in relevant_assets):
+        if any(
+            topic in claim_topics
+            or (topic == "semiconductor" and bool(claim_topics & {"semiconductors", "technology"}))
+            or (topic == "growth" and bool(claim_topics & {"growth", "small_caps"}))
+            for topic in relevant_assets
+        ):
             relevance += 2
         if item.get("url") or item.get("link"):
             relevance += 1
@@ -108,8 +116,16 @@ def rank_and_cluster_news(news: list[dict], anomalies: list[dict], claims: list[
             "crypto": "위험자산 동조 여부를 보조 확인합니다.",
         }.get(topic, "시장 관련성을 현재 가격 움직임과 대조할 보조 근거입니다.")
         links = [{"title": item.get("title_ko") or item.get("title"), "url": item.get("url") or item.get("link"), "source": item.get("source"), "time": item.get("time")} for item in members[:4]]
-        related_anomalies = [a["metric"] for a in anomalies if (topic == "oil" and "wti" in a["anomaly_id"]) or (topic == "semiconductor" and "soxx" in a["anomaly_id"]) or (topic == "rates" and "us10y" in a["anomaly_id"]) or (topic == "growth" and any(x in a["anomaly_id"] for x in ("nasdaq", "soxx")))]
-        market_reaction = "관련 anomaly: " + ", ".join(related_anomalies) if related_anomalies else "이 스토리와 직접 연결되는 가격 반응은 확인되지 않았습니다."
+        related_anomalies = [a for a in anomalies if (topic == "oil" and "wti" in a["anomaly_id"]) or (topic == "semiconductor" and "soxx" in a["anomaly_id"]) or (topic == "rates" and "us10y" in a["anomaly_id"]) or (topic == "growth" and any(x in a["anomaly_id"] for x in ("nasdaq", "soxx")))]
+        reactions = []
+        for anomaly in related_anomalies:
+            value = anomaly["value"]
+            unit = "pp" if "spread" in anomaly["anomaly_id"] else "bp" if anomaly["anomaly_id"] == "us10y_change_bp" else "%"
+            reactions.append(f"{anomaly['metric']} {value:+.2f}{unit}")
+        market_reaction = (
+            "관찰된 같은 세션 움직임: " + ", ".join(reactions) + ". 동시성만으로 인과를 확정하지 않습니다."
+            if reactions else "이 스토리와 직접 연결되는 가격 반응은 확인되지 않았습니다."
+        )
         clusters.append({
             "story_id": key, "topic": topic, "relevance_score": max(x["relevance_score"] for x in members),
             "what_happened": title, "why_it_matters": why,

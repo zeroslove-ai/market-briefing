@@ -66,7 +66,13 @@ def _market_map(features: dict) -> list[dict]:
                 "nasdaq": "기술·성장주 비중이 높아 금리와 대형 성장주 민감도를 반영합니다.",
                 "russell": "소형주 참여를 보여줘 상승 폭이 넓은지 확인하는 보조 지표입니다.",
                 "soxx": "반도체 업종의 상대 강도를 S&P와 비교해 주도 폭을 가늠합니다.",
-                "fx": "달러 강세는 금융여건이 전면 완화되지 않았을 가능성을 시사합니다.",
+                "fx": (
+                    "달러 강세는 금융여건이 전면 완화되지 않았을 가능성을 시사합니다."
+                    if value > 0 else
+                    "달러 약세는 금융여건 완화와 부합하지만 금리·VIX의 동행 확인이 필요합니다."
+                    if value < 0 else
+                    "달러 방향은 보합입니다."
+                ),
                 "fx_krw": "원화 환율은 달러 흐름과 한국 투자자의 환산 수익에 함께 영향을 줍니다.",
                 "oil": "급변은 물가·공급·수요 해석이 달라 원인 확인이 필요합니다.",
                 "gold": "금은 달러·실질금리·안전자산 수요와 함께 봅니다.",
@@ -151,20 +157,52 @@ def build_insight(payload: dict, *, persist_queue: bool = False) -> dict:
     selected += [name for name in by_id if name not in selected]
     movers = [CLAIM_TEXT[name] for name in selected[:5]]
     driver_claims = [by_id[name] for name in selected[:3]]
-    if "SEMI_LEADERSHIP" in by_id and "RATES_TAILWIND_GROWTH" in by_id:
+    if "SEMI_LEADERSHIP" in by_id:
         semi = features.get("soxx")
+        spread = features.get("soxx_sp500_spread_pp")
         rates = features.get("us10y_change_bp")
         oil = features.get("wti_change_pct")
-        conclusion = f"SOXX {semi:+.1f}% 강세와 10년물 {rates:+.0f}bp 하락이 성장주를 뒷받침했고, WTI {oil:+.1f}% 급락 배경은 추가 확인이 필요합니다." if oil is not None else f"SOXX {semi:+.1f}% 강세와 10년물 {rates:+.0f}bp 하락이 성장주를 뒷받침했지만 시장 확산은 확인이 필요합니다."
+        semi_text = (
+            f"반도체 +{semi:.1f}%가 S&P를 {spread:.1f}pp 앞섰습니다."
+            if semi is not None and semi > 0 and spread is not None else
+            f"반도체 {semi:+.1f}% 하락에도 S&P 대비 {spread:+.1f}pp 선방했습니다."
+            if semi is not None and spread is not None else
+            "반도체와 S&P의 상대 강도 차이가 커졌습니다."
+        )
+        rate_text = f" 10년물 {rates:+.0f}bp 하락은 성장주에 우호적입니다." if rates is not None and rates < 0 else f" 10년물 {rates:+.0f}bp 상승은 성장주 할인율 부담이 될 수 있습니다." if rates is not None and rates > 0 else ""
+        oil_text = (
+            f" WTI {oil:+.1f}% 급락의 공급·수요 배경은 미확인입니다."
+            if oil is not None and oil <= -4 else
+            f" WTI {oil:+.1f}% 급등의 공급·수요 배경은 확인이 필요합니다."
+            if oil is not None and oil >= 4 else
+            f" WTI {oil:+.1f}% 변동은 별도 배경 확인이 필요합니다."
+            if oil is not None else ""
+        )
+        conclusion = semi_text + rate_text + oil_text
     else:
         conclusion = " ".join(CLAIM_TEXT[name] for name in selected[:3]) or "주요 자산의 큰 괴리가 없어 뚜렷한 단일 주도 요인은 확인되지 않았습니다."
+    semi = features.get("soxx")
+    spread = features.get("soxx_sp500_spread_pp")
+    rates = features.get("us10y_change_bp")
+    oil = features.get("wti_change_pct")
+    subject_parts = []
+    if semi is not None and spread is not None and spread > 0:
+        subject_parts.append(f"반도체 주도(SOXX {semi:+.1f}%, 상대 {spread:+.1f}pp)" if semi > 0 else f"반도체 상대 선방(SOXX {semi:+.1f}%, spread {spread:+.1f}pp)")
+    if rates is not None and rates <= -3:
+        subject_parts.append(f"10Y {rates:+.0f}bp 하락")
+    elif rates is not None and rates >= 3:
+        subject_parts.append(f"10Y {rates:+.0f}bp 상승")
+    if oil is not None and abs(oil) >= 4:
+        subject_parts.append(f"WTI {oil:+.1f}% 원인 미확인")
+    subject_conclusion = "; ".join(subject_parts) if subject_parts else conclusion.split("。")[0]
     watch = list(dict.fromkeys(claim["what_to_watch"] for claim in claims))[:5]
     if not watch:
         watch = ["주요 지수의 상승 폭과 장 초반 breadth", "다음 거시 일정과 금리 반응"]
     return {
         "schema_version": 1, "features": features, "anomalies": anomalies,
         "claims": claims, "conclusion": conclusion, "market_movers": movers,
-        "market_driver_claims": driver_claims,
+        "subject_conclusion": subject_conclusion,
+        "market_driver_claims": driver_claims, "market_claim_ids": list(by_id),
         "market_map": _market_map(features), "story_clusters": stories,
         "research_needed": bool(queue), "research_queue": queue,
         "economic_events": _calendar_context(payload, features, claims),

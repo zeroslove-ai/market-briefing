@@ -20,11 +20,11 @@ def test_golden_sample_builds_deterministic_claims_queue_and_insight_rendering()
     assert insight["economic_events"][0]["contextual_importance"] == 3
     assert len(insight["earnings"]["top"]) <= 5
 
-    subject, email, _html = render_email_full(payload)
+    subject, email, email_html = render_email_full(payload)
     telegram = "\n".join(render_telegram_compact(payload))
-    assert "SOXX +4.9%" in subject and "WTI -5.5%" in subject
-    assert subject.index("SOXX") < subject.index("WTI")
+    assert "반도체 주도" in subject and "SOXX +4.9%" in subject and "WTI -5.5%" in subject
     assert "HTTP 403" not in email and "HTTP 404" not in email
+    assert "HTTP 403" not in email_html and "HTTP 404" not in email_html
     assert "HTTP 403" not in telegram and "HTTP 404" not in telegram
     assert "일부 공식 소스 지연" in email
     assert "왜 중요한가" in email
@@ -55,3 +55,16 @@ def test_sigma_oi_conflict_requires_both_sigma_and_observed_oi_values():
     payload["options"] = {"NVDA": {"total_oi": 10}}
     claims = {c["claim_id"] for c in build_insight(payload)["claims"]}
     assert "SIGMA_OI_CONFLICT" in claims
+
+
+def test_dxy_interpretation_follows_observed_direction():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["indicators"]["fx"]["dxy"]["change_pct"] = -0.7
+    row = next(x for x in build_insight(payload)["market_map"] if x["metric"] == "DXY")
+    assert "달러 약세" in row["interpretation"]
+
+
+def test_failed_news_records_are_not_rendered_as_stories():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["news"] = [{"error": "RSS HTTP 403"}]
+    assert build_insight(payload)["story_clusters"] == []

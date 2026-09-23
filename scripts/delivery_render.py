@@ -165,7 +165,12 @@ def _econ_lines(payload: dict, limit: int | None = None) -> list[str]:
                     date_only = True
         zone_label = "" if date_only else " KST"
         if date_only:
-            lines.append(f"{time_text} {_importance(item.get('importance'))}{suffix}")
+            importance = item.get("contextual_importance", item.get("importance"))
+            line = f"{time_text} {_importance(importance)}{suffix}"
+            context = item.get("why_today_matters")
+            if context:
+                line += f" — {context}"
+            lines.append(line)
         else:
             importance = item.get("contextual_importance", item.get("importance"))
             context = item.get("why_today_matters")
@@ -376,7 +381,7 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
     mode_label = "Week Kickoff" if mode == "week_kickoff" else "Close Autopsy"
     insight = payload.get("insight") or {}
     conclusion = insight.get("conclusion") or "시장 흐름은 혼조이며 뚜렷한 단일 주도 요인은 확인되지 않았습니다."
-    short_conclusion = conclusion.split("。")[0].split(". ")[0][:62]
+    short_conclusion = insight.get("subject_conclusion") or conclusion.split("。")[0].split(". ")[0][:62]
     day = date_text[5:7].lstrip("0") + "/" + date_text[8:10].lstrip("0") if len(date_text) >= 10 else date_text
     subject = f"[미국증시 모닝] {short_conclusion} | {day} 06:30 KST"
 
