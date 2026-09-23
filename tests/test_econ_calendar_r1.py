@@ -39,12 +39,19 @@ BEGIN:VEVENT
 DTSTART;TZID=America/New_York:20260924
 SUMMARY:Employment Situation day marker
 END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20260925T123000Z
+SUMMARY:Hybrid UTC timestamp
+END:VEVENT
 END:VCALENDAR"""
     events = parse_bls_ics(fixture)
     assert events[0]["scheduled_at"].endswith("-04:00")
     assert events[1]["scheduled_at"] is None
     assert events[1]["status"] == "scheduled_date_only"
     assert events[1]["scheduled_date"] == "2026-09-24"
+    assert events[2]["scheduled_at"].endswith("-04:00")
+    assert events[2]["scheduled_at_kst"].endswith("+09:00")
+    assert "08:30:00" in events[2]["scheduled_at"]
 
 
 def test_yearless_schedule_dates_resolve_to_years_inside_requested_window():
