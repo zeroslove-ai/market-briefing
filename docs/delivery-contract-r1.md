@@ -5,6 +5,7 @@ Parent:
 - `docs/hermes-integrated-intelligence-r1.md`
 - `docs/hermes-sigma-briefing-contract.md`
 - `docs/hermes-korean-explanation-r1.md`
+- `docs/market-indicators-r1.md`
 
 ## 1. 원칙
 
@@ -92,6 +93,22 @@ Telegram:
 - “전체 일정은 이메일” 링크/문구 가능
 
 ---
+
+## 4A. 주요 지표 블록
+
+시장 지표 상세 계약은 `docs/market-indicators-r1.md`를 따른다.
+
+Email/Telegram 공통 필수 자산군:
+- 주식지수: S&P 500, Nasdaq, Russell 2000, SOXX (Dow/NDX 보조)
+- 선물: ES/NQ/YM/RTY
+- 금리/변동성: 10Y/30Y, VIX
+- FX: DXY, USD/KRW
+- 원자재: WTI, Gold, Silver
+- Crypto: BTC, ETH
+
+Telegram에서는 4~5줄의 Market Board로 압축한다.
+
+Crypto는 24/7이므로 반드시 `24h` 변화라고 표기하고 주식의 전일 정규장 등락과 혼용하지 않는다.
 
 ## 5. 실적 캘린더 계약
 
@@ -203,9 +220,12 @@ Subject 예:
 한줄:
 AI/나스닥은 강했지만 S&P 보합·다우 약세로 상승 폭은 좁았습니다.
 
-📈 시장
-S&P ... | Nasdaq ... | SOXX ...
-10Y ... | VIX ... | WTI ...
+📊 주요 지표
+주식 S&P ... | Nasdaq ... | Russell ... | SOXX ...
+금리/변동 10Y ... | VIX ... | DXY ...
+원자재 WTI ... | Gold ... | Silver ...
+크립토 BTC ... (24h) | ETH ... (24h)
+선물 ES ... | NQ ... | RTY ...   # phase에 유의미할 때
 
 🧭 핵심 해석
 • ...
