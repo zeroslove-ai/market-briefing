@@ -308,6 +308,9 @@ def main(mode):
         top_bull = [s for s in signals if s["direction"] == "bullish"][:4]
         top_bear = [s for s in signals if s["direction"] == "bearish"][:4]
         out["signals"] = top_bull + top_bear
+        # Preserve the close option map in latest_close.json for the morning
+        # delivery renderer; the dedicated OI snapshot remains the baseline authority.
+        out["options"] = option_data
         anomalies.sort(key=lambda x: x["oi_chg_pct"], reverse=True)
         out["oi_anomalies"] = anomalies
 

@@ -36,6 +36,37 @@ def within_delivery_window(now: datetime) -> bool:
     return MORNING_START <= local <= MORNING_CATCHUP_UNTIL
 
 
+def _load_option_context(previous_close: dict) -> dict:
+    """Prefer the close-owned option snapshot; retain legacy close fallback."""
+    close_state = read_json(state_path("option", "oi_close_snapshot.json"), {}) or {}
+    snapshots = close_state.get("snapshots", {}) if isinstance(close_state, dict) else {}
+    previous = close_state.get("previous_snapshots", {}) if isinstance(close_state, dict) else {}
+    signal_doc = read_json(state_path("option", "flow_signals.json"), {}) or {}
+    signals = {
+        item.get("ticker"): item
+        for item in signal_doc.get("signals", [])
+        if isinstance(item, dict) and item.get("ticker")
+    } if isinstance(signal_doc, dict) else {}
+    if snapshots:
+        options = {}
+        for ticker, current in snapshots.items():
+            if not isinstance(current, dict):
+                continue
+            prior = previous.get(ticker, {}) if isinstance(previous, dict) else {}
+            prior_total = prior.get("total_oi") if isinstance(prior, dict) else None
+            current_total = current.get("total_oi")
+            options[ticker] = {
+                **current,
+                "oi_change": current_total - prior_total
+                if isinstance(current_total, (int, float)) and isinstance(prior_total, (int, float))
+                else None,
+                "iv30": signals.get(ticker, {}).get("iv30"),
+            }
+        if options:
+            return options
+    return previous_close.get("options", {}) if isinstance(previous_close, dict) else {}
+
+
 def build_morning_payload(now: datetime | None = None) -> dict:
     now = now or datetime.now(tz=KST)
     local = now.astimezone(KST)
@@ -63,7 +94,7 @@ def build_morning_payload(now: datetime | None = None) -> dict:
         "news": collect_news(),
         "econ_calendar": econ,
         "earnings": collect_earnings(upcoming_session),
-        "options": previous_close.get("options", {}),
+        "options": _load_option_context(previous_close),
         "data_quality": list(board.get("data_quality", [])) + [f"econ_calendar: {error}" for error in econ_errors],
     }
     return payload

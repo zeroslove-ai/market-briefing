@@ -152,6 +152,19 @@ def _earnings_lines(payload: dict, limit: int | None = None) -> list[str]:
     return lines
 
 
+def _option_lines(payload: dict, limit: int = 8) -> list[str]:
+    lines = []
+    for symbol, item in list((payload.get("options") or {}).items())[:limit]:
+        if not isinstance(item, dict) or item.get("error"):
+            continue
+        iv = _pct((item.get("iv30") or 0) * 100, 1) if isinstance(item.get("iv30"), (int, float)) else "-"
+        oi_change = item.get("oi_change")
+        lines.append(
+            f"{symbol} | IV30 {iv} | OI {item.get('total_oi', '-')} | OI Δ {oi_change if oi_change is not None else '-'}"
+        )
+    return lines
+
+
 def _news_lines(payload: dict, limit: int = 5) -> list[str]:
     items = _clean_items(payload.get("news", []))[:limit]
     lines = []
@@ -185,7 +198,7 @@ def render_telegram_compact(payload: dict, max_chars: int = 3500) -> list[str]:
     if econ:
         lines += ["", "🗓 오늘 일정 (KST)", *econ]
     elif payload.get("econ_calendar"):
-        lines += ["", "🗓 오늘 일정", "• 경제 캘린더 소스 확인 필요"]
+        lines += ["", "🗓 오늘 일정 (KST)", "• 경제 캘린더 소스 확인 필요"]
 
     earnings = _earnings_lines(payload, 5)
     if earnings:
@@ -242,14 +255,10 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
     parts += ["", "■ 오늘 주요 실적"]
     parts += [f"- {line}" for line in earnings] if earnings else ["- 주요 실적 데이터 없음"]
 
-    options = payload.get("options") or {}
+    options = _option_lines(payload)
     if options:
         parts += ["", "■ 옵션 / OI"]
-        for symbol, item in list(options.items())[:8]:
-            if not isinstance(item, dict) or item.get("error"):
-                continue
-            iv = _pct((item.get("iv30") or 0) * 100, 1) if isinstance(item.get("iv30"), (int, float)) else "-"
-            parts.append(f"- {symbol} | IV30 {iv} | OI {item.get('total_oi', '-')} | OI Δ {item.get('oi_change', '-')}")
+        parts.extend(f"- {line}" for line in options)
 
     quality = payload.get("data_quality") or []
     if quality:
@@ -266,6 +275,8 @@ def render_email_full(payload: dict) -> tuple[str, str, str]:
         "<h2>오늘 경제 캘린더 — KST</h2><ul>" + ("".join(f"<li>{html.escape(item)}</li>" for item in econ) if econ else "<li>경제 캘린더 데이터 없음 또는 소스 오류</li>") + "</ul>",
         "<h2>오늘 주요 실적</h2><ul>" + ("".join(f"<li>{html.escape(item)}</li>" for item in earnings) if earnings else "<li>주요 실적 데이터 없음</li>") + "</ul>",
     ]
+    if options:
+        html_sections.append("<h2>옵션 / OI</h2><ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in options) + "</ul>")
     if quality:
         html_sections.append("<h2>데이터 품질</h2><ul>" + "".join(f"<li>{html.escape(str(item))}</li>" for item in quality) + "</ul>")
     html_body = "<html><body style=\"font-family:Arial,sans-serif;line-height:1.55\">" + "".join(html_sections) + "<p><small>동일 canonical snapshot 기반. Sigma/News Intelligence 통합 후 해설 강화 예정.</small></p></body></html>"

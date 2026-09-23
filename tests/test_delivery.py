@@ -69,6 +69,14 @@ def test_telegram_contains_cross_asset_board_kst_calendar_and_earnings():
     assert all(len(message) <= 3500 for message in messages)
 
 
+def test_telegram_calendar_fallback_still_labels_kst():
+    payload = sample_payload()
+    payload["econ_calendar"] = [{"error": "HTTP 403"}]
+    text = "\n".join(delivery_render.render_telegram_compact(payload))
+    assert "오늘 일정 (KST)" in text
+    assert "경제 캘린더 소스 확인 필요" in text
+
+
 def test_email_full_and_telegram_use_same_payload_facts():
     payload = sample_payload()
     subject, plain, html = delivery_render.render_email_full(payload)
@@ -78,6 +86,25 @@ def test_email_full_and_telegram_use_same_payload_facts():
         assert token in telegram
     assert "06:30 KST" in subject
     assert "<html>" in html
+    assert "<h2>옵션 / OI</h2>" in html
+    assert "NVDA | IV30 +42.0% | OI 1000" in html
+
+
+def test_morning_option_context_reads_canonical_close_state(monkeypatch, tmp_path):
+    monkeypatch.setattr(state_store, "STATE_ROOT", tmp_path)
+    state_store.atomic_write_json(state_store.state_path("option", "oi_close_snapshot.json"), {
+        "session_date": "2026-09-22",
+        "snapshots": {"NVDA": {"call_oi": 120, "put_oi": 80, "total_oi": 200}},
+        "previous_snapshots": {"NVDA": {"call_oi": 100, "put_oi": 70, "total_oi": 170}},
+    })
+    state_store.atomic_write_json(state_store.state_path("option", "flow_signals.json"), {
+        "signals": [{"ticker": "NVDA", "iv30": 0.42}],
+    })
+    options = morning_delivery._load_option_context({"options": {"OLD": {"total_oi": 1}}})
+    assert options["NVDA"] == {
+        "call_oi": 120, "put_oi": 80, "total_oi": 200, "oi_change": 30, "iv30": 0.42,
+    }
+    assert "OLD" not in options
 
 
 def test_delivery_ledger_is_channel_specific_and_idempotent(monkeypatch, tmp_path):
