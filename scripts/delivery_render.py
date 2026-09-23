@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Iterable
 
 
@@ -135,7 +136,24 @@ def _econ_lines(payload: dict, limit: int | None = None) -> list[str]:
         if item.get("actual") not in (None, ""):
             values.append(f"실제 {item['actual']}")
         suffix = f" | {' / '.join(values)}" if values else ""
-        lines.append(f"{item.get('time', '-')} KST | {item.get('event', '-')} {_importance(item.get('importance'))}{suffix}")
+        scheduled = item.get("scheduled_at_kst")
+        time_text = item.get("time")
+        date_only = False
+        if scheduled:
+            try:
+                from datetime import datetime
+                time_text = datetime.fromisoformat(scheduled).strftime("%m-%d %H:%M")
+            except (TypeError, ValueError):
+                pass
+        title = item.get("title") or item.get("event") or "-"
+        if not scheduled and item.get("status") == "scheduled_date_only":
+            match = re.match(r"(\d{4}-\d{2}-\d{2})\s+", title)
+            if match:
+                time_text = f"{match.group(1)} ET date (time TBA)"
+                title = title[match.end():]
+                date_only = True
+        zone_label = "" if date_only else " KST"
+        lines.append(f"{time_text or '-'}{zone_label} | {title} {_importance(item.get('importance'))}{suffix}")
     return lines
 
 
@@ -152,10 +170,73 @@ def _earnings_lines(payload: dict, limit: int | None = None) -> list[str]:
     return lines
 
 
+CORE_OPTION_WATCHLIST = (
+    "NVDA", "AMD", "MU", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA",
+    "AVGO", "TSM", "INTC", "QCOM", "ARM", "ASML", "LRCX", "AMAT", "KLAC",
+    "MRVL", "SMCI", "COIN", "HOOD", "PLTR", "SPY", "QQQ",
+)
+
+
+def rank_option_symbols(payload: dict, limit: int = 8) -> list[str]:
+    """Rank actual signals first, then core coverage, then OI/IV evidence."""
+    options = payload.get("options") or {}
+    if not isinstance(options, dict):
+        return []
+    signals = payload.get("current_flow_signals") or payload.get("signals") or []
+    anomalies = payload.get("oi_anomalies") or []
+    signal_order = {}
+    for records in (signals, anomalies):
+        for record in records if isinstance(records, list) else []:
+            if not isinstance(record, dict):
+                continue
+            ticker = record.get("ticker") or record.get("symbol")
+            if ticker:
+                signal_order.setdefault(str(ticker).upper(), len(signal_order))
+    for ticker, item in options.items():
+        if isinstance(item, dict) and (item.get("signal") or item.get("anomaly") or item.get("is_anomaly")):
+            signal_order.setdefault(str(ticker).upper(), len(signal_order))
+
+    watch_order = {ticker: index for index, ticker in enumerate(CORE_OPTION_WATCHLIST)}
+    valid = {
+        str(ticker).upper(): item for ticker, item in options.items()
+        if isinstance(item, dict) and not item.get("error")
+    }
+
+    def score(ticker: str):
+        item = valid[ticker]
+        oi_delta = item.get("oi_change")
+        try:
+            oi_magnitude = abs(float(oi_delta))
+        except (TypeError, ValueError):
+            oi_magnitude = -1.0
+        iv = item.get("iv30")
+        iv_valid = isinstance(iv, (int, float)) and iv > 0
+        total_oi = item.get("total_oi")
+        try:
+            total = float(total_oi)
+        except (TypeError, ValueError):
+            total = -1.0
+        return (
+            0 if ticker in signal_order else 1,
+            signal_order.get(ticker, 0) if ticker in signal_order else 0,
+            0 if ticker in watch_order else 1,
+            watch_order.get(ticker, 0) if ticker in watch_order else 0,
+            -oi_magnitude,
+            0 if iv_valid else 1,
+            -float(iv) if iv_valid else 0.0,
+            -total,
+        )
+
+    ranked = sorted(valid, key=score)
+    return ranked[:max(0, min(limit, 8))]
+
+
 def _option_lines(payload: dict, limit: int = 8) -> list[str]:
     lines = []
-    for symbol, item in list((payload.get("options") or {}).items())[:limit]:
-        if not isinstance(item, dict) or item.get("error"):
+    options = payload.get("options") or {}
+    for symbol in rank_option_symbols(payload, limit):
+        item = options.get(symbol) or options.get(symbol.lower())
+        if not isinstance(item, dict):
             continue
         iv = _pct((item.get("iv30") or 0) * 100, 1) if isinstance(item.get("iv30"), (int, float)) else "-"
         oi_change = item.get("oi_change")

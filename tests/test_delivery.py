@@ -90,6 +90,31 @@ def test_email_full_and_telegram_use_same_payload_facts():
     assert "NVDA | IV30 +42.0% | OI 1000" in html
 
 
+def test_option_ranking_puts_current_signal_before_watchlist_and_metrics():
+    payload = {
+        "options": {
+            "AAPL": {"oi_change": 9999, "iv30": 0.9, "total_oi": 90000},
+            "NVDA": {"oi_change": 1, "iv30": 0.2, "total_oi": 100},
+            "ZZZ": {"oi_change": 5000, "iv30": 1.4, "total_oi": 40000},
+            "AMD": {"oi_change": 200, "iv30": None, "total_oi": 1200},
+        },
+        "current_flow_signals": [{"ticker": "NVDA", "score": 80}],
+    }
+    ranked = delivery_render.rank_option_symbols(payload)
+    assert ranked[0] == "NVDA"
+    assert ranked[1:3] == ["AMD", "AAPL"]
+    assert delivery_render._option_lines(payload)[0].startswith("NVDA |")
+
+
+def test_option_ranking_uses_oi_change_and_valid_iv_after_watchlist():
+    payload = {"options": {
+        "ZZZ_SMALL": {"oi_change": 5, "iv30": None, "total_oi": 100},
+        "ZZZ_LARGE": {"oi_change": -500, "iv30": 0.4, "total_oi": 900},
+        "ZZZ_IV": {"oi_change": 400, "iv30": 0.8, "total_oi": 800},
+    }}
+    assert delivery_render.rank_option_symbols(payload, limit=3) == ["ZZZ_LARGE", "ZZZ_IV", "ZZZ_SMALL"]
+
+
 def test_morning_option_context_reads_canonical_close_state(monkeypatch, tmp_path):
     monkeypatch.setattr(state_store, "STATE_ROOT", tmp_path)
     state_store.atomic_write_json(state_store.state_path("option", "oi_close_snapshot.json"), {

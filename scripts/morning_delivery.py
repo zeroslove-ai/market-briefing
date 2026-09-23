@@ -12,10 +12,11 @@ from pathlib import Path
 from delivery_adapters import send_telegram
 from delivery_render import render_email_full, render_telegram_compact
 from market_board import collect_market_board
-from market_clock import KST, last_actual_regular_session, next_regular_session, now_kst
+from market_clock import ET, KST, last_actual_regular_session, next_regular_session, now_kst
 from market_data import RunCache
 from state_store import atomic_write_json, read_json, state_path, utc_now_iso
-from us_market_report import collect_earnings, collect_econ, collect_news
+from econ_calendar_r1 import collect_econ_events
+from us_market_report import collect_earnings, collect_news
 
 
 MORNING_START = time(6, 30)
@@ -76,9 +77,10 @@ def build_morning_payload(now: datetime | None = None) -> dict:
     cache = RunCache()
     board = collect_market_board(cache)
     previous_close = read_json(state_path("report_snapshots", "latest_close.json"), {}) or {}
+    flow_state = read_json(state_path("option", "flow_signals.json"), {}) or {}
 
-    econ = collect_econ()
-    econ_errors = [item.get("error") for item in econ if isinstance(item, dict) and item.get("error")]
+    next_session = next_regular_session(upcoming_session)
+    econ, econ_errors = collect_econ_events(upcoming_session, next_session)
     payload = {
         "schema_version": 1,
         "generated_at": utc_now_iso(),
@@ -89,12 +91,15 @@ def build_morning_payload(now: datetime | None = None) -> dict:
             "scheduled_cutoff_at_kst": datetime.combine(local.date(), MORNING_START, tzinfo=KST).isoformat(),
             "generated_at_kst": local.isoformat(),
             "upcoming_us_session": upcoming_session.isoformat(),
+            "next_us_session": next_session.isoformat(),
         },
         "indicators": board.get("indicators", {}),
         "news": collect_news(),
         "econ_calendar": econ,
         "earnings": collect_earnings(upcoming_session),
         "options": _load_option_context(previous_close),
+        "current_flow_signals": flow_state.get("signals", []) if isinstance(flow_state, dict) else [],
+        "oi_anomalies": previous_close.get("oi_anomalies", []) if isinstance(previous_close, dict) else [],
         "data_quality": list(board.get("data_quality", [])) + [f"econ_calendar: {error}" for error in econ_errors],
     }
     return payload
