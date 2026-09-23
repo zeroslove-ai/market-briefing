@@ -295,6 +295,33 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
+## R1-DELIVERY — 06:30 Dual Brief (#6)
+
+### Common
+- [ ] 06:30 KST cutoff
+- [ ] same canonical JSON for both channels
+- [ ] KST-first time formatter
+- [ ] date rollover formatter
+- [ ] delivery idempotency
+
+### Email Full
+- [ ] full market/news analysis
+- [ ] all tracked economic events with KST time
+- [ ] major earnings with report window/call time
+- [ ] source links
+- [ ] beginner helper optional
+- [ ] HTML + plain text
+- [ ] Gmail adapter
+
+### Telegram Compact
+- [ ] 1~2 screens / 2~3 minute read
+- [ ] top 3 news
+- [ ] high/medium calendar only
+- [ ] major earnings only
+- [ ] 3~5 watch points
+- [ ] full newsletter reference
+- [ ] Telegram adapter
+
 ## R2 — Gamma / UI
 
 ### Gamma concentration
