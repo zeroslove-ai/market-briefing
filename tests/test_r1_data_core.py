@@ -48,6 +48,72 @@ def test_open_close_gate_tracks_dst_and_skips_observed_holiday():
     assert not phase_gate.is_phase_due("open", summer_open.replace(hour=14))
 
 
+def test_morning_delivery_friday_to_monday_session_matrix():
+    cases = [
+        (datetime(2026, 9, 25, 6, 30, tzinfo=KST), True, "2026-09-24"),  # Fri KST / Thu ET
+        (datetime(2026, 9, 26, 6, 30, tzinfo=KST), True, "2026-09-25"),  # Sat KST / Fri ET
+        (datetime(2026, 9, 27, 6, 30, tzinfo=KST), False, None),          # Sun KST / Sat ET
+        (datetime(2026, 9, 28, 6, 30, tzinfo=KST), False, None),          # Mon KST / Sun ET
+    ]
+    for now, expected, session_date in cases:
+        decision = phase_gate.delivery_decision("morning", now)
+        assert decision["eligible"] is expected
+        assert decision["session_date"] == session_date
+
+
+def test_evening_delivery_friday_to_monday_session_matrix():
+    cases = [
+        (datetime(2026, 9, 25, 21, 0, tzinfo=KST), True, "2026-09-25"),
+        (datetime(2026, 9, 26, 21, 0, tzinfo=KST), False, None),
+        (datetime(2026, 9, 27, 21, 0, tzinfo=KST), False, None),
+        (datetime(2026, 9, 28, 21, 0, tzinfo=KST), True, "2026-09-28"),
+    ]
+    for now, expected, session_date in cases:
+        decision = phase_gate.delivery_decision("evening", now)
+        assert decision["eligible"] is expected
+        assert decision["session_date"] == session_date
+
+
+def test_morning_reboot_catchup_is_bounded_and_marked_late():
+    catchup = phase_gate.delivery_decision("morning", datetime(2026, 9, 22, 6, 40, tzinfo=KST))
+    expired = phase_gate.delivery_decision("morning", datetime(2026, 9, 22, 8, 30, tzinfo=KST))
+    assert catchup["eligible"] and catchup["delivery_status"] == "catchup"
+    assert catchup["late"] is True and catchup["catchup"] is True
+    assert not expired["eligible"]
+
+
+def test_evening_catchup_respects_dst_open_and_two_hour_cap():
+    # In EDT the open is 22:30 KST; in EST it is 23:30 KST.
+    edt_before_open = phase_gate.delivery_decision("evening", datetime(2026, 3, 10, 22, 25, tzinfo=KST))
+    edt_after_open = phase_gate.delivery_decision("evening", datetime(2026, 3, 10, 22, 31, tzinfo=KST))
+    est_before_limit = phase_gate.delivery_decision("evening", datetime(2026, 1, 6, 22, 50, tzinfo=KST))
+    est_after_limit = phase_gate.delivery_decision("evening", datetime(2026, 1, 6, 23, 1, tzinfo=KST))
+    assert edt_before_open["eligible"] and edt_before_open["late"]
+    assert not edt_after_open["eligible"]
+    assert est_before_limit["eligible"] and est_before_limit["delivery_status"] == "catchup"
+    assert not est_after_limit["eligible"]
+
+
+def test_kst_delivery_eligibility_skips_us_holidays_and_carries_catchup_state(monkeypatch, tmp_path):
+    import subprocess
+    monkeypatch.setattr(state_store, "STATE_ROOT", tmp_path)
+    runs = []
+    monkeypatch.setattr(phase_gate.subprocess, "run", lambda *args, **kwargs: runs.append(args) or subprocess.CompletedProcess(args[0], 0))
+    holiday_morning = phase_gate.delivery_decision("morning", datetime(2026, 9, 8, 6, 40, tzinfo=KST))
+    holiday_evening = phase_gate.delivery_decision("evening", datetime(2026, 9, 7, 21, 0, tzinfo=KST))
+    assert not holiday_morning["eligible"]
+    assert not holiday_evening["eligible"]
+
+    catchup_time = datetime(2026, 9, 22, 6, 40, tzinfo=KST)
+    assert phase_gate.run_phase("morning", catchup_time) == 0
+    assert phase_gate.run_phase("morning", catchup_time) == 0
+    state = json.loads((tmp_path / "scheduler" / "phase_runs.json").read_text())
+    record = state["runs"]["morning:2026-09-21"]
+    assert record["delivery_status"] == "catchup"
+    assert record["late"] and record["catchup"]
+    assert len(runs) == 1
+
+
 def test_yahoo_regular_close_is_authoritative_over_meta_price():
     calls = []
 
