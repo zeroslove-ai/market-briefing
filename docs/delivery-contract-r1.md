@@ -279,7 +279,7 @@ Email:
 ```text
 canonical JSON
    ├─ render_email_full()
-   │     └─ Gmail / SMTP delivery
+   │     └─ Gmail MCP / ChatGPT Work delivery
    └─ render_telegram_compact()
          └─ Telegram delivery
 ```
@@ -296,12 +296,21 @@ canonical JSON
 
 ## 10. Email technical recommendation
 
-우선순위:
+정본:
 
-1. Gmail API/connected Gmail
-2. SMTP fallback
+1. **Connected Gmail MCP / ChatGPT Work**
+2. EC2에는 Gmail password, App Password, OAuth refresh token을 저장하지 않는다.
+3. EC2는 `*-gmail-mcp.json` handoff artifact만 만든다.
+4. Gmail 실행 주체는 authenticated Gmail profile을 읽고 자기 계정으로 발송한다.
+
+SMTP/App Password 경로는 R1에서 사용하지 않는다.
 
 email artifact:
+- `subject`
+- plain-text body
+- raw HTML body
+- Gmail MCP handoff JSON
+- recipient strategy = authenticated Gmail profile self
 - plain text + HTML multipart
 - 모바일 우선
 - wide table 최소화
