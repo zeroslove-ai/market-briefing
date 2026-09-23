@@ -53,6 +53,38 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
+## R1-INFRA — Stable Runtime / Multi-Agent Adapter (#5)
+
+### Core
+- [ ] OS-level always-on scheduler entrypoint
+- [ ] canonical JSON artifact before narrative
+- [ ] idempotency: session_date + phase + schema
+- [ ] heartbeat / completed / delivered timestamps
+- [ ] retry / degraded mode
+- [ ] duplicate delivery guard
+
+### Provider abstraction
+- [ ] narrative provider interface
+- [ ] Hermes adapter
+- [ ] fallback narrative adapter
+- [ ] research provider interface
+- [ ] delivery provider interface
+
+### Tool lanes
+- [ ] Codex + GitHub MCP development path
+- [ ] Aside MCP browser-evidence path
+- [ ] Cursor Cloud Agent/Automation QA path
+- [ ] Grok Bot research-worker pilot
+- [ ] GitHub Actions watchdog
+- [ ] OpenAI Agents API evaluation lane
+
+### Korean explanation
+- [ ] intermediate default
+- [ ] optional beginner helper
+- [ ] Korean glossary rules
+- [ ] internal enum -> natural Korean
+- [ ] explanation fixture tests
+
 ## R1-1 — Weekly Sigma Core
 
 ### R1-1.1 Foundation
@@ -286,12 +318,13 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 ## 실행 순서
 
 1. **R1-0 Data Integrity Foundation**
-2. **R1-1 Weekly Sigma Core** and **R1-2 News/Event Intelligence** (병렬 가능)
-3. **R1-3 Evidence Engine**
-4. **R1-4 OI/Sigma Integration**
-5. **R1-5 Four-report Integration**
-6. **R1-6 Explanation QA**
-7. **R1-7 Historical Validation**
+2. **R1-INFRA Stable Runtime foundation** — R1-0와 병행 가능
+3. **R1-1 Weekly Sigma Core** and **R1-2 News/Event Intelligence** (병렬 가능)
+4. **R1-3 Evidence Engine**
+5. **R1-4 OI/Sigma Integration**
+6. **R1-5 Four-report Integration**
+7. **R1-6 Explanation QA**
+8. **R1-7 Historical Validation**
 
 첫 production PR은 Sigma math가 아니라 **공통 데이터/session/state 기반 정리**부터 시작한다.
 
