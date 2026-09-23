@@ -68,6 +68,12 @@ R1의 4개 보고 역할:
 
 ```
 scripts/
+  market_clock.py         # DST-aware ET/KST session and phase resolver
+  market_data.py          # Yahoo/CBOE shared cache and authority adapters
+  market_board.py         # canonical cross-asset indicator collector
+  state_store.py          # repo-root state + atomic writes
+  report_snapshots.py     # phase snapshots and change deltas
+  r1_dry_run.py           # public-data/server smoke entrypoint
   us_market_report.py       # 증시 보고 수집 (시세·뉴스·실적·경제캘린더·옵션)
   option_flow_report.py     # 옵션플로우 수집 (open/close 모드, 신호·검증·스냅샷)
   option_flow_open.py       # open 모드 진입점 (크론용)
@@ -76,6 +82,9 @@ state/
   oi_snapshot.json          # 증시 보고용 전일 OI 스냅샷
   flow_oi_snapshot.json     # 옵션플로우용 전일 콜/풋 OI 스냅샷 (별도 파일)
   flow_signals.json         # 전일 신호 저장 (다음 실행에서 결과 검증)
+  option/                   # close-owned OI and option-flow state
+  report_snapshots/         # latest_morning/evening/open/close (runtime)
+  report_history/           # JSONL report history (runtime)
 docs/
   data-sources.md           # 검증된 무료 소스 목록 (실측 결과 포함)
   signal-rules.md           # 신호·백드롭·검증 계산 규칙
@@ -89,6 +98,7 @@ SKILL.md                    # Hermes 운영 스킬 문서 (노하우 포함)
 
 ```bash
 python scripts/us_market_report.py                 # 증시 보고 JSON 출력
+python scripts/r1_dry_run.py --phase morning        # canonical R1 public-data smoke test
 python scripts/option_flow_report.py close         # 옵션플로우 마감 (61종 CBOE 순차, ~3분)
 python scripts/option_flow_report.py open          # 옵션플로우 장 시작 (~10초)
 ```
@@ -108,6 +118,14 @@ python scripts/option_flow_report.py open          # 옵션플로우 장 시작 
 - **BLS / BEA** — R1 공식 거시지표/발표 추가 예정
 - **investing.com** — 경제 캘린더 (USD, 중요도 2+)
 - **Yahoo Trending** — 화제 종목
+
+## AWS EC2 dry-run bootstrap
+
+`deploy/bootstrap-ec2.sh` installs the minimum Ubuntu packages, creates a
+virtualenv, clones `feature/hermes-r1-data-core`, and runs the canonical
+`r1_dry_run.py`. The systemd unit/timers under `deploy/` are an inactive
+schedule foundation; enable them only after reviewing the server state and
+delivery credentials. No email/Telegram secrets are required for the dry-run.
 
 ## 라이선스
 

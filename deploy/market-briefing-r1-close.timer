@@ -1,0 +1,11 @@
+[Unit]
+Description=Market Briefing R1 close timer (America/New_York; DST-aware)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:05:00 America/New_York
+AccuracySec=1s
+Persistent=false
+Unit=market-briefing-r1@close.service
+
+[Install]
+WantedBy=timers.target

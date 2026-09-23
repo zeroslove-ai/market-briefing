@@ -1,0 +1,10 @@
+[Unit]
+Description=Market Briefing R1 canonical %i dry-run
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/market-briefing
+ExecStart=/opt/market-briefing/.venv/bin/python /opt/market-briefing/scripts/phase_gate.py --phase %i

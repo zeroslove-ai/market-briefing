@@ -19,13 +19,17 @@ import sys
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 import time
 
-UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"}
-ET = timezone(timedelta(hours=-4))  # EDT(여름). 겨울 EST(-5)는 시간만 +1h 이동, 심볼은 동일
-KST = timezone(timedelta(hours=9))
+from market_clock import ET, KST, get_market_clock
+from market_data import RunCache, cboe_chain_summary, fetch_url, yahoo_chart_quote, yahoo_daily_last as shared_yahoo_daily_last
+from report_snapshots import persist_report_snapshot
+from state_store import atomic_write_json, commit_oi_close, load_flow_signals, load_oi_baseline, read_json, state_path
 
+_RUN_CACHE = RunCache()
+
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"}
 # 고정 유니버스 56종 (+ Trending 상위 5 = 61종)
 UNIVERSE = [
     # 기존 추적 12
@@ -46,69 +50,15 @@ EXTRA = ["CL=F", "DX-Y.NYB", "^TNX", "^TYX", "KRW=X", "^VIX", "GC=F", "SI=F"]
 
 
 def fetch(url, timeout=20):
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+    return fetch_url(url, timeout)
 
 
 def yahoo_quote(symbol):
-    """Yahoo chart — 캔들 마지막 2개로 전일 대비 등락 계산 + 마지막 캔들 ET 날짜."""
-    url = (
-        "https://query1.finance.yahoo.com/v8/finance/chart/"
-        + urllib.parse.quote(symbol)
-        + "?range=5d&interval=1d"
-    )
-    d = json.loads(fetch(url))
-    res = d["chart"]["result"][0]
-    m = res["meta"]
-    ts = res.get("timestamp", [])
-    closes = res["indicators"]["quote"][0].get("close", [])
-    price = m.get("regularMarketPrice")
-    prev = None
-    data_date = None
-    et_date = None
-    if len(closes) >= 2:
-        valid = [(t, c) for t, c in zip(ts, closes) if c is not None]
-        if len(valid) >= 2:
-            prev = valid[-2][1]
-            last_ts = valid[-1][0]
-            et_dt = datetime.fromtimestamp(last_ts, tz=ET)
-            data_date = et_dt.strftime("%m-%d")
-            et_date = et_dt.strftime("%m-%d(%a)")
-    chg = round(price - prev, 2) if (prev and price) else None
-    pct = round((price - prev) / prev * 100, 2) if (prev and price) else None
-    return {
-        "symbol": symbol,
-        "name": m.get("shortName") or m.get("longName") or symbol,
-        "price": price,
-        "prev": prev,
-        "change": chg,
-        "change_pct": pct,
-        "data_date": data_date,
-        "et_date": et_date,
-    }
+    return yahoo_chart_quote(symbol, cache=_RUN_CACHE, fetcher=fetch)
 
 
 def yahoo_daily_last(symbol):
-    """마지막 일봉(고/저/종) — 신호 결과 검증용."""
-    url = (
-        "https://query1.finance.yahoo.com/v8/finance/chart/"
-        + urllib.parse.quote(symbol)
-        + "?range=5d&interval=1d"
-    )
-    d = json.loads(fetch(url))
-    res = d["chart"]["result"][0]
-    ts = res.get("timestamp", [])
-    q = res["indicators"]["quote"][0]
-    highs, lows, closes = q.get("high", []), q.get("low", []), q.get("close", [])
-    valid = [(t, h, lo, c) for t, h, lo, c in zip(ts, highs, lows, closes) if c is not None and h is not None]
-    if not valid:
-        return None
-    t, h, lo, c = valid[-1]
-    return {
-        "date": datetime.fromtimestamp(t, tz=ET).strftime("%m-%d(%a)"),
-        "high": h, "low": lo, "close": c,
-    }
+    return shared_yahoo_daily_last(symbol, cache=_RUN_CACHE, fetcher=fetch)
 
 
 def fetch_cboe(sym):
@@ -119,47 +69,7 @@ def fetch_cboe(sym):
         (실적발표 급등분이 종가에 포함됨 — TEAM +30.4% 오류 실측).
         → 가격·등락은 반드시 Yahoo 정규장(yahoo_quote)을 정본으로 사용. 여기선 OI/IV만.
     """
-    url = f"https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
-    last_err = None
-    for attempt in range(4):
-        try:
-            d = json.loads(fetch(url, timeout=25))
-            break
-        except urllib.error.HTTPError as e:
-            last_err = e
-            if e.code == 429:
-                time.sleep(10 * (attempt + 1))
-                continue
-            raise
-        except Exception as e:
-            last_err = e
-            time.sleep(2)
-            continue
-    else:
-        raise last_err
-    time.sleep(1.5)  # rate limit 회복 대기 (실측: 1~2분 window)
-    data = d["data"]
-    opts = data.get("options") or []
-    call_oi = put_oi = 0
-    for o in opts:
-        name = o.get("option") or ""
-        if len(name) < 9:
-            continue
-        oi = o.get("open_interest") or 0
-        if name[-9] == "C":
-            call_oi += oi
-        elif name[-9] == "P":
-            put_oi += oi
-    iv30_raw = data.get("iv30")
-    iv30 = (iv30_raw / 100) if (iv30_raw and iv30_raw > 1) else iv30_raw
-    sd_pct = round(iv30 * (30 / 365) ** 0.5 * 100, 2) if iv30 else None
-    return {
-        "call_oi": call_oi,
-        "put_oi": put_oi,
-        "total_oi": call_oi + put_oi,
-        "iv30": iv30,
-        "sd_pct": sd_pct,
-    }
+    return cboe_chain_summary(sym, cache=_RUN_CACHE, fetcher=fetch)
 
 
 def conv_score(chg_pct, price_chg_pct, iv30, sigma_hit):
@@ -209,21 +119,16 @@ def backdrop(quotes):
 
 
 def load_json(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
+    return read_json(path)
 
 
 def save_json(path, obj):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False)
+    atomic_write_json(path, obj)
 
 
-def collect_earnings():
+def collect_earnings(session_date):
     try:
-        d = json.loads(fetch(f"https://api.nasdaq.com/api/calendar/earnings?date={date.today().isoformat()}"))
+        d = json.loads(fetch(f"https://api.nasdaq.com/api/calendar/earnings?date={session_date.isoformat()}"))
         rows = d.get("data", {}).get("rows", []) or []
         return [
             {"symbol": r.get("symbol"), "name": r.get("name"),
@@ -298,11 +203,11 @@ def main(mode):
     if mode not in ("open", "close"):
         print(json.dumps({"error": "mode must be open|close"}, ensure_ascii=False))
         return 1
-    base = os.path.dirname(os.path.abspath(__file__))
-    snap_path = os.path.join(base, "flow_oi_snapshot.json")
-    sig_path = os.path.join(base, "flow_signals.json")
+    global _RUN_CACHE
+    _RUN_CACHE = RunCache()
+    clock = get_market_clock(mode)
 
-    out = {"generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "mode": mode}
+    out = {"generated_at": clock.now_kst.strftime("%Y-%m-%d %H:%M%z"), "mode": mode, "meta": clock.as_dict()}
 
     # 1) 시세 18종 + 세션 라벨
     quotes = {}
@@ -333,13 +238,13 @@ def main(mode):
 
     if mode == "open":
         # 3) 전일 마감 신호 재표시 (오늘 관전 포인트)
-        prev = load_json(sig_path) or {}
+        prev = load_flow_signals()
         out["prev_signals"] = prev.get("signals", [])
         out["prev_session"] = prev.get("date", "")
     else:
         # 3) CBOE 61종 순차 수집 (⚠️ 병렬 61연발은 429 유발 — 실측. 반드시 순차)
         #    가격·등락은 CBOE가 아니라 Yahoo 정규장(yahoo_quote)을 정본으로 사용
-        #    (CBOE current_price는 애프터/프리마켓 반영 — TEAM +30.4% 오류 실측).
+        #    CBOE current quote fields are ignored because they can include after-hours data.
         option_data = {}
         for s in universe:
             try:
@@ -359,7 +264,7 @@ def main(mode):
                 option_data[s] = {"error": str(e)[:60]}
 
         # 4) 전일 스냅샷 대비 OI 증감 → 비정상 OI + 컨빅션 신호
-        prev_snap = load_json(snap_path) or {}
+        prev_snap = load_oi_baseline(clock.market_session_date)["snapshots"]
         signals, anomalies = [], []
         for s, o in option_data.items():
             if "error" in o or not o.get("total_oi"):
@@ -407,7 +312,7 @@ def main(mode):
         out["oi_anomalies"] = anomalies
 
         # 5) 전일 신호 결과 검증 (종가/고점/저점 %)
-        prev = load_json(sig_path) or {}
+        prev = load_flow_signals()
         verification = []
         if prev.get("signals"):
             def verify_one(sig):
@@ -436,18 +341,21 @@ def main(mode):
         out["verification"] = verification
 
         # 6) 스냅샷·신호 저장 (다음 실행의 전일 대비 기준)
-        save_json(snap_path, {
+        commit_oi_close(clock.market_session_date, {
             s: {"call_oi": o.get("call_oi"), "put_oi": o.get("put_oi"), "total_oi": o.get("total_oi")}
             for s, o in option_data.items() if "error" not in o and o.get("total_oi")
+        }, owner="option_flow_close")
+        save_json(state_path("option", "flow_signals.json"), {
+            "schema_version": 1, "generated_at": clock.now_kst.isoformat(),
+            "session_date": clock.market_session_date.isoformat(), "date": ses, "signals": out["signals"],
         })
-        save_json(sig_path, {"date": ses, "signals": out["signals"]})
 
     # 7) 공통: 실적/뉴스/경제 캘린더 (open 모드는 전망용으로 핵심)
-    out["earnings"] = collect_earnings()
+    out["earnings"] = collect_earnings(clock.market_session_date)
     out["news"] = collect_news()
     out["econ_calendar"] = collect_econ() if mode == "open" else []
 
-    print(json.dumps(out, ensure_ascii=False, indent=1))
+    print(json.dumps(persist_report_snapshot(mode, out, clock.market_session_date), ensure_ascii=False, indent=1))
     return 0
 
 
