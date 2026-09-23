@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "session_date": "2026-09-22",
+  "delivery": {"mode": "close_autopsy", "delivery_date": "2026-09-23"},
+  "indicators": {
+    "equities": {
+      "sp500": {"price": 7700, "change_pct": 1.49},
+      "nasdaq_composite": {"price": 27000, "change_pct": 2.3},
+      "russell_2000": {"price": 2800, "change_pct": 0.5},
+      "soxx": {"price": 600, "change_pct": 4.9}
+    },
+    "futures": {
+      "es": {"change_pct": 0.09},
+      "nq": {"change_pct": 0.04},
+      "rty": {"change_pct": -0.06}
+    },
+    "rates": {"us10y": {"price": 4.963, "change": -0.04}},
+    "volatility": {"vix": {"price": 15.0, "change_pct": 0.4}},
+    "fx": {"dxy": {"price": 100.1, "change_pct": 0.31}},
+    "commodities": {
+      "wti": {"price": 80, "change_pct": -5.5},
+      "gold_futures": {"price": 3800, "change_pct": 0.3},
+      "silver_futures": {"price": 47, "change_pct": 0.5}
+    },
+    "crypto": {
+      "btc": {"price": 64000, "change_pct": 1.4, "reference_window": "24h"},
+      "eth": {"price": 3400, "change_pct": 1.0, "reference_window": "24h"}
+    }
+  },
+  "news": [
+    {"title": "TSMC and semiconductor demand lift chip stocks", "source": "CNBC", "url": "https://example.com/chips"},
+    {"title": "Oil drops as traders assess supply and demand", "source": "CNBC", "url": "https://example.com/oil"},
+    {"title": "White House briefing on unrelated matter", "source": "CNBC"}
+  ],
+  "econ_calendar": [
+    {"title": "EIA Weekly Petroleum Status Report", "importance": 2, "scheduled_at_kst": "2026-09-23T23:30:00+09:00"}
+  ],
+  "earnings": [
+    {"symbol": "NVDA", "name": "NVIDIA", "time": "after-hours"},
+    {"symbol": "AMD", "name": "AMD", "time": "after-hours"},
+    {"symbol": "MU", "name": "Micron", "time": "after-hours"},
+    {"symbol": "AAPL", "name": "Apple", "time": "after-hours"},
+    {"symbol": "MSFT", "name": "Microsoft", "time": "after-hours"},
+    {"symbol": "PAYX", "name": "Paychex", "time": "pre-market"}
+  ],
+  "options": {},
+  "oi_anomalies": [],
+  "data_quality": ["econ_calendar: HTTP 403", "missing quote HTTP 404"]
+}
