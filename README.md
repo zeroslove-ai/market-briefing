@@ -7,21 +7,22 @@ Hermes Agent가 **무료 데이터 소스만으로** 미국 증시와 옵션플�
 
 ## 개발 예정 — Hermes R1 Integrated Market Intelligence
 
-기존 4종 브리핑을 유지하면서 Weekly Sigma·시장/섹터 breadth·OI·금리/VIX/달러·이벤트를 함께 교차검증해 **무엇이 바뀌었고 왜 그렇게 해석하는지**를 설명하는 구조로 확장합니다.
+기존 4종 브리핑을 유지하면서 Weekly Sigma·시장/섹터 breadth·OI·금리/VIX/달러·**뉴스/공시/거시 이벤트**를 함께 교차검증해 **무엇이 바뀌었고 왜 그렇게 해석하는지**를 설명하는 종합 주식 인텔리전스로 확장합니다. 기본 독자는 주식 중급자입니다.
 
 핵심 흐름: `공통 데이터 정본 -> deterministic 분석 -> Evidence/Counter-evidence -> LLM 해설 -> Telegram`
 
 설계 authority:
 
 1. [`docs/hermes-integrated-intelligence-r1.md`](docs/hermes-integrated-intelligence-r1.md) — 최상위 제품/분석 정본
-2. [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — Weekly Sigma 계산 정본
-3. [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 실제 PR 구현 순서
-4. [`docs/hermes-sigma-briefing-contract.md`](docs/hermes-sigma-briefing-contract.md) — 기존 4종 보고 + 깊은 설명 규칙
-5. [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 비전문가용 쉬운 해설
-6. [`docs/hermes-sigma-task-board.md`](docs/hermes-sigma-task-board.md) — 실행 작업보드
-7. [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션 인수인계
+2. [`docs/hermes-news-intelligence-r1.md`](docs/hermes-news-intelligence-r1.md) — 뉴스/SEC/Fed/거시 이벤트 정본
+3. [`docs/hermes-sigma-product-spec.md`](docs/hermes-sigma-product-spec.md) — Weekly Sigma 계산 정본
+4. [`docs/hermes-sigma-implementation-plan.md`](docs/hermes-sigma-implementation-plan.md) — 실제 PR 구현 순서
+5. [`docs/hermes-sigma-briefing-contract.md`](docs/hermes-sigma-briefing-contract.md) — 기존 4종 보고 + 깊은 설명 규칙
+6. [`docs/hermes-sigma-explainer.md`](docs/hermes-sigma-explainer.md) — 비전문가용 쉬운 해설
+7. [`docs/hermes-sigma-task-board.md`](docs/hermes-sigma-task-board.md) — 실행 작업보드
+8. [`docs/hermes-sigma-ai-handoff.md`](docs/hermes-sigma-ai-handoff.md) — 새 GPT/Codex/Claude 세션 인수인계
 
-> 구현 순서는 **R1-0 Data Integrity Foundation -> R1-1 Sigma -> R1-2 Evidence Engine -> 4종 보고 통합**입니다. 기존 production 보고는 단계별 회귀 테스트로 유지합니다.
+> 구현 순서는 **R1-0 Data Integrity Foundation -> Sigma + News/Event Intelligence -> Evidence Engine -> 4종 보고 통합**입니다. 기존 production 보고는 단계별 회귀 테스트로 유지합니다.
 
 R1의 4개 보고 역할:
 
@@ -98,7 +99,10 @@ python scripts/option_flow_report.py open          # 옵션플로우 장 시작 
 - **Yahoo Finance chart API** — 지수·선물·종목 시세, 정규장 OHLC (가격의 정본)
 - **CBOE 지연 옵션 API** — 종목별 옵션 체인 (OI, IV, 1SD 계산용)
 - **Nasdaq API** — 실적 발표 캘린더
-- **CNBC RSS** — 시장 뉴스
+- **CNBC RSS** — 기존 시장 뉴스
+- **SEC EDGAR** — R1 기업 공시/filing 추가 예정
+- **Federal Reserve** — R1 FOMC/발표/연설 추가 예정
+- **BLS / BEA** — R1 공식 거시지표/발표 추가 예정
 - **investing.com** — 경제 캘린더 (USD, 중요도 2+)
 - **Yahoo Trending** — 화제 종목
 
