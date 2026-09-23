@@ -1,7 +1,8 @@
 # Hermes R1 Integrated Market Intelligence — Product & Analysis Authority
 
 Status: DESIGN AUTHORITY (R1)
-Scope: 기존 Hermes 4종 보고 + Sigma Intelligence + 설명/검증 레이어 통합
+Scope: 기존 Hermes 4종 보고 + Sigma Intelligence + News/Event Intelligence + 설명/검증 레이어 통합
+Target reader: 주식 중급자 — 기본 시장용어는 알고 있으나 여러 소스를 매일 직접 연결해 해석하기는 부담스러운 사용자
 
 ## 1. North Star
 
@@ -45,8 +46,10 @@ LLM은 숫자를 다시 계산하거나 원인을 창작하지 않는다.
 - CBOE options: IV/OI/Greeks
 - Earnings
 - Economic calendar
-- News
+- News / official filings / macro releases
 - Yahoo Trending
+
+뉴스/이벤트 상세 authority는 `docs/hermes-news-intelligence-r1.md`를 따른다. 기존 CNBC RSS는 유지하고 SEC/Fed/BLS/BEA 공식 소스를 단계적으로 추가한다.
 
 가격 정본은 Yahoo regular session. CBOE는 IV/OI/Greeks 전용이다.
 
@@ -81,7 +84,15 @@ LLM은 숫자를 다시 계산하거나 원인을 창작하지 않는다.
    - event result vs forecast
    - important-news candidate
 
-5. **Change since previous briefing**
+5. **News / Event Intelligence**
+   - official-source events
+   - story clustering / duplicate suppression
+   - entity + sector linking
+   - materiality / novelty
+   - event-to-price reaction
+   - news + Sigma/OI/sector context
+
+6. **Change since previous briefing**
    - morning -> evening
    - evening -> open
    - open -> close
@@ -280,13 +291,13 @@ Hermes 설명:
 
 질문: **오늘 무엇이 확정됐고, 무엇은 아직 미확정인가?**
 
-## 7. 초보자와 고급 사용자를 한 보고에서 같이 만족시키는 방법
+## 7. 중급 투자자가 읽기 좋은 설명 구조
 
 한 보고를 3층으로 만든다.
 
 ### Layer 1 — 30초 요약
 
-전문용어 최소화.
+핵심 용어는 숨기지 않되, 수치가 의미하는 시장 메커니즘을 한 문장으로 붙인다. 단순 교과서 정의보다 ‘현재 시장에서 왜 중요한가’를 설명한다.
 
 예:
 
@@ -305,6 +316,15 @@ Hermes 설명:
 “NVDA -1.22σ / Δz -0.41 / put OI +18% / semiconductor median -0.84σ”
 
 기본 Telegram은 Layer 1+2 중심, 중요한 후보만 Layer 3를 붙인다.
+
+중급자 설명 표준 예:
+
+- `10Y +8bp` -> “장기 할인율 압력이 커져 고밸류 성장주에 부담이 될 수 있는 방향”
+- `VIX 15 -> 19` -> “절대수준은 극단적 공포가 아니지만 위험 프리미엄이 빠르게 확대”
+- `breadth 하락` -> “지수보다 개별 종목 약세가 넓어져 지수 표면보다 내부가 취약”
+- `-1.2σ` -> “이번 주 옵션 기대 하단거리보다 약 20% 더 내려온 상태”
+- `put OI +18%` -> “하방 옵션 포지셔닝 관심이 커진 흔적이지만 신규 숏으로 확정할 수는 없음”
+- `ticker +4%, sector +1%` -> “시장 전체보다 해당 종목 고유 재료가 강했을 가능성을 높이는 relative strength”
 
 ## 8. 데이터 품질과 현재 반드시 고칠 문제
 
@@ -356,7 +376,12 @@ Hermes 설명:
   "market": {},
   "cross_asset": {},
   "events": {},
-  "news": [],
+  "news": {
+    "clusters": [],
+    "official_events": [],
+    "since_previous_report": [],
+    "stats": {}
+  },
   "sigma": {},
   "options": {},
   "changes_since_previous_report": {},
@@ -427,7 +452,18 @@ R1에서는 확률처럼 보이는 가짜 정밀도를 만들지 않는다.
 - sector
 - history
 
-### R1-2 Evidence Engine
+### R1-2 News / Event Intelligence
+
+- 기존 CNBC RSS 보존
+- SEC EDGAR filings
+- Fed releases/speeches
+- BLS/BEA macro official sources
+- entity linking
+- dedup/story clustering
+- materiality/novelty
+- price/Sigma/OI reaction linking
+
+### R1-3 Evidence Engine
 
 - market regime component
 - cross-asset rules
@@ -436,7 +472,7 @@ R1에서는 확률처럼 보이는 가짜 정밀도를 만들지 않는다.
 - change-since-last-report
 - watch ranking
 
-### R1-3 Four-report Integration
+### R1-4 Four-report Integration
 
 - 07:00 close autopsy
 - 21:00 setup
@@ -445,14 +481,14 @@ R1에서는 확률처럼 보이는 가짜 정밀도를 만들지 않는다.
 - 기존 섹션 유지
 - 초보자 Layer 1/2 + 필요 시 Layer 3
 
-### R1-4 Validation
+### R1-5 Validation
 
 - legacy regression
 - historical condition tracking
 - stale/holiday/DST tests
 - explanation hallucination tests
 
-### R1-5 S2+
+### R1-6 S2+
 
 - gamma concentration proxy
 - dashboard/API
@@ -467,12 +503,13 @@ Hermes R1 PASS 조건:
 - 가격/OI session date가 명확하다.
 - 아침 -> 저녁 -> open -> close 변화가 계산된다.
 - Weekly Sigma와 기존 30D expected move가 혼용되지 않는다.
-- 시장/섹터/종목/OI/cross-asset 근거를 함께 설명한다.
+- 시장/섹터/종목/OI/cross-asset/공식 뉴스·이벤트 근거를 함께 설명한다.
 - 설명에 counter-evidence가 포함될 수 있다.
 - LLM이 없는 숫자를 만들지 않는다.
 - 원인 미확인 시 인과관계를 단정하지 않는다.
-- 초보자가 30초 요약만 읽어도 핵심을 이해할 수 있다.
-- 고급 사용자는 같은 보고에서 근거 숫자를 확인할 수 있다.
+- 중급 투자자가 30초 요약만 읽어도 시장 구조와 핵심 촉매를 파악할 수 있다.
+- 전문용어는 유지하되 의미·메커니즘·한계를 함께 설명한다.
+- 같은 보고에서 근거 숫자와 공식 source를 확인할 수 있다.
 
 ## 14. 제품 정의 한 문장
 
