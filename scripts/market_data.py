@@ -109,7 +109,7 @@ def yahoo_daily_last(symbol: str, cache: Optional[RunCache] = None, fetcher: Fet
 
 
 def cboe_chain_summary(symbol: str, cache: Optional[RunCache] = None, fetcher: Fetcher = fetch_url,
-                       sleep_seconds: float = 1.5) -> dict:
+                       sleep_seconds: float = 1.5, reference_price: Optional[float] = None) -> dict:
     cache = cache or RunCache()
     key = f"cboe-chain:{symbol}"
     cached = cache.get(key)
@@ -145,6 +145,31 @@ def cboe_chain_summary(symbol: str, cache: Optional[RunCache] = None, fetcher: F
             call_oi += open_interest
         elif name[-9] == "P":
             put_oi += open_interest
+    oi_top = []
+    for option in sorted(data.get("options") or [], key=lambda item: item.get("open_interest") or 0, reverse=True)[:3]:
+        name = option.get("option") or ""
+        try:
+            oi_top.append({
+                "strike": int(name[-8:]) / 1000,
+                "type": name[-9],
+                "oi": option.get("open_interest"),
+                "iv": round(option.get("iv") or 0, 4),
+            })
+        except (ValueError, TypeError, IndexError):
+            continue
+    atm = None
+    if reference_price is not None and data.get("options"):
+        valid_options = []
+        for option in data.get("options") or []:
+            name = option.get("option") or ""
+            try:
+                valid_options.append((abs(int(name[-8:]) / 1000 - reference_price), option, int(name[-8:]) / 1000))
+            except (ValueError, TypeError, IndexError):
+                continue
+        if valid_options:
+            _, option, strike = min(valid_options, key=lambda item: item[0])
+            atm = {"strike": strike, "type": (option.get("option") or "")[-9],
+                   "iv": round(option.get("iv") or 0, 4), "oi": option.get("open_interest")}
     iv30_raw = data.get("iv30")
     iv30 = (iv30_raw / 100) if iv30_raw and iv30_raw > 1 else iv30_raw
     output = {
@@ -153,6 +178,8 @@ def cboe_chain_summary(symbol: str, cache: Optional[RunCache] = None, fetcher: F
         "total_oi": call_oi + put_oi,
         "iv30": iv30,
         "sd_pct": round(iv30 * (30 / 365) ** 0.5 * 100, 2) if iv30 else None,
+        "oi_top": oi_top,
+        "atm": atm,
         "source": "cboe_options",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "reference_window": "options_chain",

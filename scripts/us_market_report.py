@@ -96,7 +96,7 @@ def collect_econ():
 
 
 def _cboe_option_data(symbol, yahoo, cache):
-    option = cboe_chain_summary(symbol, cache=cache, fetcher=fetch, sleep_seconds=0)
+    option = cboe_chain_summary(symbol, cache=cache, fetcher=fetch, sleep_seconds=0, reference_price=yahoo.get("price"))
     return {
         "price": yahoo.get("price"),
         "change_pct": yahoo.get("change_pct"),
@@ -106,8 +106,8 @@ def _cboe_option_data(symbol, yahoo, cache):
         "put_oi": option.get("put_oi"),
         "total_oi": option.get("total_oi"),
         "oi_change": None,
-        "oi_top": [],
-        "atm": None,
+        "oi_top": option.get("oi_top", []),
+        "atm": option.get("atm"),
         "1sd_30d": round((yahoo.get("price") or 0) * (option.get("sd_pct") or 0) / 100, 2) if option.get("sd_pct") else None,
         "source": "cboe_options",
         "reference_window": "options_chain",
