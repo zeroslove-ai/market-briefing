@@ -97,7 +97,48 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
-## R1-2 — Evidence Engine
+## R1-2 — News / Event Intelligence
+
+### R1-2.1 Preserve existing
+- [ ] CNBC RSS adapter 유지
+- [ ] Nasdaq earnings 유지
+- [ ] investing.com economic calendar 유지
+- [ ] 기존 뉴스 번역/요약 regression
+
+### R1-2.2 Official sources
+- [ ] SEC ticker -> CIK mapping
+- [ ] SEC recent filings: 8-K/10-Q/10-K/6-K/20-F/capital forms
+- [ ] Fed releases/speeches/testimony adapter
+- [ ] BLS public API adapter
+- [ ] BEA releases/schedule adapter
+- [ ] source tier + timestamp + URL
+
+### R1-2.3 Normalize / Cluster
+- [ ] common News Event Object
+- [ ] event taxonomy
+- [ ] entity/ticker linking
+- [ ] sector linking
+- [ ] dedup/story clustering
+- [ ] NEW/UPDATE/DUPLICATE novelty
+- [ ] CRITICAL/HIGH/NORMAL/LOW materiality
+
+### R1-2.4 Reaction
+- [ ] ticker return
+- [ ] sector-relative return
+- [ ] market-relative return
+- [ ] Sigma transition
+- [ ] OI context
+- [ ] event/price alignment without causal overclaim
+
+### R1-2.5 Report delta
+- [ ] since previous report only
+- [ ] morning story duplicate suppression
+- [ ] unresolved/carry-over story
+- [ ] source authority preference
+
+---
+
+## R1-3 — Evidence Engine
 
 ### R1-2.1 Market state
 - [ ] direction
@@ -136,7 +177,7 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
-## R1-3 — Existing OI + Sigma Integration
+## R1-4 — Existing OI + Sigma Integration
 
 ### Preserve legacy
 - [ ] legacy market_backdrop remains available
@@ -159,7 +200,7 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
-## R1-4 — Four-report Integration
+## R1-5 — Four-report Integration
 
 ### 07:00 Close Autopsy
 - [ ] legacy market data
@@ -196,7 +237,7 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
-## R1-5 — Explanation QA
+## R1-6 — Explanation QA
 
 - [ ] LLM does not recalculate
 - [ ] no missing-value invention
@@ -209,7 +250,7 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 
 ---
 
-## R1-6 — Historical Validation
+## R1-7 — Historical Validation
 
 - [ ] SIGMA_ONLY outcomes
 - [ ] OI_ONLY outcomes
@@ -245,12 +286,12 @@ Sigma보다 먼저 기존 Hermes의 공통 데이터 기반을 정리한다.
 ## 실행 순서
 
 1. **R1-0 Data Integrity Foundation**
-2. **R1-1 Weekly Sigma Core**
-3. **R1-2 Evidence Engine**
-4. **R1-3 OI/Sigma Integration**
-5. **R1-4 Four-report Integration**
-6. **R1-5 QA**
-7. **R1-6 Validation**
+2. **R1-1 Weekly Sigma Core** and **R1-2 News/Event Intelligence** (병렬 가능)
+3. **R1-3 Evidence Engine**
+4. **R1-4 OI/Sigma Integration**
+5. **R1-5 Four-report Integration**
+6. **R1-6 Explanation QA**
+7. **R1-7 Historical Validation**
 
 첫 production PR은 Sigma math가 아니라 **공통 데이터/session/state 기반 정리**부터 시작한다.
 
