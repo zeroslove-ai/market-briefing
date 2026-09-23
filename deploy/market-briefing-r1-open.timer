@@ -1,11 +1,11 @@
 [Unit]
-Description=Market Briefing R1 opening timer (KST)
+Description=Market Briefing R1 opening timer (America/New_York; DST-aware)
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 22:30:00 Asia/Seoul
-Persistent=true
+OnCalendar=Mon..Fri *-*-* 09:30:00 America/New_York
+AccuracySec=1s
+Persistent=false
 Unit=market-briefing-r1@open.service
 
 [Install]
 WantedBy=timers.target
-

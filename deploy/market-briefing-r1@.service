@@ -7,5 +7,4 @@ Wants=network-online.target
 Type=oneshot
 User=ubuntu
 WorkingDirectory=/opt/market-briefing
-ExecStart=/opt/market-briefing/.venv/bin/python /opt/market-briefing/scripts/r1_dry_run.py --phase %i
-
+ExecStart=/opt/market-briefing/.venv/bin/python /opt/market-briefing/scripts/phase_gate.py --phase %i
