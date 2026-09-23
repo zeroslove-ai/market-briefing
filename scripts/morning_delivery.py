@@ -16,6 +16,7 @@ from market_clock import ET, KST, last_actual_regular_session, next_regular_sess
 from market_data import RunCache
 from state_store import atomic_write_json, read_json, state_path, utc_now_iso
 from econ_calendar_r1 import collect_econ_events
+from insight_engine import build_insight
 from us_market_report import collect_earnings, collect_news
 
 
@@ -102,6 +103,7 @@ def build_morning_payload(now: datetime | None = None) -> dict:
         "oi_anomalies": previous_close.get("oi_anomalies", []) if isinstance(previous_close, dict) else [],
         "data_quality": list(board.get("data_quality", [])) + [f"econ_calendar: {error}" for error in econ_errors],
     }
+    payload["insight"] = build_insight(payload, persist_queue=True)
     return payload
 
 
